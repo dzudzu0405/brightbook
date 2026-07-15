@@ -9,6 +9,12 @@ const typeNames={"word-search":"Word Search","coloring":"Coloring","educational-
 const initialActivities=$$("#activityType option").map(o=>({value:o.value,label:o.textContent}));
 const initialGenres=$$("#genreType option").map(o=>o.value);
 const initialPageCounts=$$("#pageCount option").map(o=>o.value);
+const THEME_GROUP_FALLBACK=$$("#theme option").map(o=>({
+  name:o.value||o.textContent,
+  category:o.closest("optgroup")?.label||"Themes",
+  featureKey:`theme.${(o.value||o.textContent).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}`,
+  compatibleActivityTypes:initialActivities.map(a=>a.value)
+}));
 function userToken(){const qs=new URLSearchParams(location.search);const t=qs.get("token");if(t){localStorage.setItem("brightbookUserToken",t);return t}return localStorage.getItem("brightbookUserToken")||"demo-token"}
 async function api(path,options={}){const r=await fetch(path,{...options,headers:{"Content-Type":"application/json","x-user-token":userToken(),...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Something went wrong.");return d}
 function hasFeature(key){return accountFeatures.has(key)}
@@ -61,7 +67,8 @@ function setThemeOptions(items,current){
 }
 function applyFeatureGates(){
   const previous={activity:$("#activityType").value,theme:$("#theme").value,genre:$("#genreType").value,pageCount:$("#pageCount").value};
-  const planActivities=initialActivities.filter(a=>hasFeature(`activity.${a.value}`));
+  const planActivitiesByFeature=initialActivities.filter(a=>hasFeature(`activity.${a.value}`));
+  const planActivities=planActivitiesByFeature.length?planActivitiesByFeature:initialActivities;
   setPlainOptions($("#activityType"),planActivities,previous.activity);
 
   let activity=$("#activityType").value;
@@ -73,12 +80,14 @@ function applyFeatureGates(){
 
   let genre=$("#genreType").value;
   let g=genreInfo(genre);
-  let themes=(catalog.themes||[]).filter(t=>{
+  let allThemes=catalog.themes?.length?catalog.themes:THEME_GROUP_FALLBACK;
+  let themes=allThemes.filter(t=>{
     const allowedByPlan=hasFeature(t.featureKey);
     const activityCompatible=t.compatibleActivityTypes.includes(activity);
     const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return allowedByPlan&&activityCompatible&&genreCompatible;
+    return (allowedByPlan||!accountFeatures.size)&&activityCompatible&&genreCompatible;
   });
+  if(!themes.length)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
   setThemeOptions(themes,previous.theme);
 
   let theme=$("#theme").value;
@@ -98,15 +107,18 @@ function applyFeatureGates(){
   });
   setPlainOptions($("#activityType"),finalActivities.length?finalActivities:planActivities,$("#activityType").value);
   activity=$("#activityType").value;
-  themes=(catalog.themes||[]).filter(t=>{
+  allThemes=catalog.themes?.length?catalog.themes:THEME_GROUP_FALLBACK;
+  themes=allThemes.filter(t=>{
     const allowedByPlan=hasFeature(t.featureKey);
     const activityCompatible=t.compatibleActivityTypes.includes(activity);
     const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return allowedByPlan&&activityCompatible&&genreCompatible;
+    return (allowedByPlan||!accountFeatures.size)&&activityCompatible&&genreCompatible;
   });
+  if(!themes.length)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
   setThemeOptions(themes,$("#theme").value);
 
-  const pageCounts=initialPageCounts.filter(value=>hasFeature(`quantity.${value}`)).map(value=>({value,label:value}));
+  const pageCountsByFeature=initialPageCounts.filter(value=>hasFeature(`quantity.${value}`)).map(value=>({value,label:value}));
+  const pageCounts=pageCountsByFeature.length?pageCountsByFeature:initialPageCounts.map(value=>({value,label:value}));
   setPlainOptions($("#pageCount"),pageCounts,previous.pageCount);
   $("#saveProject").disabled=!hasFeature("export.save-project");
   $("#exportJson").disabled=!hasFeature("export.json");
