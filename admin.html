@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrightBook Admin</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+  <main class="admin-main">
+    <section class="admin-hero">
+      <div>
+        <span class="eyebrow">BRIGHTBOOK ADMIN</span>
+        <h1>User, Plan & Feature Management</h1>
+        <p>Manage customer accounts, plan tiers, feature access, and recent generation history. No credit system required.</p>
+      </div>
+      <label class="admin-token"><span>Admin Token</span><input id="adminToken" type="password" value="brightbook-admin"></label>
+    </section>
+
+    <section class="admin-grid">
+      <article class="admin-card">
+        <div class="admin-card-head"><h2>Create User</h2><button id="createUser">Create</button></div>
+        <div class="grid two">
+          <label><span>Email</span><input id="userEmail" placeholder="customer@example.com"></label>
+          <label><span>Name</span><input id="userName" placeholder="Customer name"></label>
+          <label><span>Plan</span><select id="userPlan"></select></label>
+        </div>
+        <p class="admin-note">The generated user token is what your payment system or login system should attach to generation requests.</p>
+      </article>
+
+      <article class="admin-card">
+        <div class="admin-card-head"><h2>Create Plan</h2><button id="createPlan">Create</button></div>
+        <div class="grid two">
+          <label><span>Plan Name</span><input id="planName" placeholder="Growth"></label>
+          <label><span>Internal Usage Label</span><input id="planLimit" type="number" placeholder="0"></label>
+          <label><span>Price Cents</span><input id="planPrice" type="number" placeholder="7900"></label>
+        </div>
+        <p class="admin-note">This is not used as credit blocking. Feature checkboxes below decide what each plan can access.</p>
+      </article>
+    </section>
+
+    <section class="admin-grid">
+      <article class="admin-card">
+        <div class="admin-card-head"><h2>Create Feature</h2><button id="createFeature">Create</button></div>
+        <div class="grid two">
+          <label><span>Feature Key</span><input id="featureKey" placeholder="export.pdf"></label>
+          <label><span>Name</span><input id="featureName" placeholder="PDF Export"></label>
+          <label><span>Category</span><input id="featureCategory" placeholder="Exports"></label>
+          <label><span>Description</span><input id="featureDescription" placeholder="Allow users to export PDF files"></label>
+        </div>
+        <p class="admin-note">Use stable keys like <code>activity.coloring</code>, <code>quantity.30</code>, or <code>export.pdf</code>. Backend already enforces generation-related keys.</p>
+      </article>
+
+      <article class="admin-card">
+        <div class="admin-card-head"><h2>Assign Features to Plan</h2><button id="savePlanFeatures">Save</button></div>
+        <label><span>Plan</span><select id="featurePlan"></select></label>
+        <div id="featureMatrix" class="feature-matrix"></div>
+      </article>
+    </section>
+
+    <section class="admin-card">
+      <div class="admin-card-head"><h2>Users</h2><button id="refresh">Refresh</button></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Email</th><th>Plan</th><th>Features</th><th>History</th><th>Status</th><th>Token</th><th>Actions</th></tr></thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-card">
+      <div class="admin-card-head"><h2>Recent Usage</h2></div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Date</th><th>User</th><th>Units</th><th>Activity</th><th>Theme</th></tr></thead>
+          <tbody id="usage"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast"><b>✓</b><span><strong></strong><small></small></span></div>
+  <script src="admin.js"></script>
+</body>
+</html>

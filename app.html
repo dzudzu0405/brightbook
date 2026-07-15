@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrightBook Studio — Educational Activity Book Creator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#"><span>BB</span><strong>BrightBook</strong></a>
+      <button class="new-book" id="newBook">＋ Create New Book</button>
+      <nav>
+        <button class="active" data-view="creator">✦ Book Creator</button>
+        <button data-view="projects">▦ Saved Projects</button>
+        <button data-view="templates">◇ Template Library</button>
+      </nav>
+      <div class="side-spacer"></div>
+      <div class="account-dock" id="accountDock">
+        <button class="account-button" id="accountButton" type="button">
+          <span class="account-avatar" id="accountAvatar">BB</span>
+          <span class="account-meta">
+            <strong id="accountName">Demo User</strong>
+            <small id="accountPlan">Creator plan</small>
+          </span>
+          <i>⌄</i>
+        </button>
+        <div class="account-menu hidden" id="accountMenu">
+          <div class="account-menu-head">
+            <span class="account-avatar">BB</span>
+            <div>
+              <strong id="accountMenuName">Demo User</strong>
+              <small id="accountEmail">demo@brightbook.local</small>
+            </div>
+          </div>
+          <div class="account-plan-card">
+            <small>Current plan</small>
+            <strong id="accountMenuPlan">Creator</strong>
+            <span id="accountStatus">Active account</span>
+          </div>
+          <a href="admin.html">Admin Panel</a>
+          <button type="button" id="copyAccountToken">Copy Access Token</button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <button class="menu">☰</button>
+        <div><small>BRIGHTBOOK WORKSPACE</small><h1 id="pageTitle">Educational Activity Book Creator</h1></div>
+      </header>
+
+      <section class="view active" id="creatorView">
+        <div class="intro">
+          <div>
+            <span class="eyebrow">FROM IDEA TO COMPLETE BOOK PLAN</span>
+            <h2>Create educational activity books<br><em>in just a few simple steps.</em></h2>
+            <p>Choose an age group, topic, and learning skills. BrightBook creates a structured book plan with activities, answer keys, and consistent image prompts.</p>
+          </div>
+          <div class="status-pill"><span>●</span> Ready to Create</div>
+        </div>
+
+        <div class="workspace">
+          <section class="builder">
+            <div class="section-title"><span>01</span><div><small>BOOK SETUP</small><h3>Set Up Your Book</h3></div></div>
+
+            <div class="grid two primary-selects">
+              <label><span>Activity Type</span>
+                <select id="activityType">
+                  <option value="word-search">Word Search Book</option>
+                  <option value="coloring" selected>Coloring Book</option>
+                  <option value="educational-story">Educational Storybook</option>
+                  <option value="maze">Maze Book</option>
+                  <option value="tracing">Tracing & Handwriting Book</option>
+                  <option value="matching">Matching Activity Book</option>
+                  <option value="counting">Counting Book</option>
+                  <option value="simple-math">Math Practice Book</option>
+                  <option value="spot-difference">Spot the Difference Book</option>
+                  <option value="puzzle">Children's Puzzle Book</option>
+                  <option value="learning-worksheet">Educational Worksheet Pack</option>
+                </select>
+                <small class="field-help">Choose one product format</small>
+              </label>
+              <label><span>Theme</span>
+                <select id="theme">
+                  <optgroup label="Animals">
+                    <option>Ocean Animals</option><option>Farm Animals</option><option>Safari Animals</option><option>Woodland Animals</option><option>Rainforest Animals</option><option>Arctic Animals</option><option>Dinosaurs</option><option>Insects & Butterflies</option><option>Birds</option><option>Pets</option>
+                  </optgroup>
+                  <optgroup label="Careers & Community">
+                    <option>Community Helpers</option><option>Doctors & Nurses</option><option>Firefighters</option><option>Police Officers</option><option>Teachers & School</option><option>Construction Workers</option><option>Farmers</option><option>Chefs & Bakers</option><option>Scientists</option><option>Astronauts</option>
+                  </optgroup>
+                  <optgroup label="Science & Adventure">
+                    <option>Outer Space</option><option>Solar System</option><option>Weather</option><option>Seasons</option><option>Human Body</option><option>Plants & Gardens</option><option>Volcanoes</option><option>Oceans & Coral Reefs</option><option>Camping Adventure</option><option>Treasure Hunt</option>
+                  </optgroup>
+                  <optgroup label="Learning & Everyday Life">
+                    <option>Alphabet</option><option>Numbers 1–20</option><option>Shapes</option><option>Colors</option><option>Opposites</option><option>Healthy Habits</option><option>Emotions & Feelings</option><option>Friendship & Kindness</option><option>Safety Rules</option><option>Daily Routines</option>
+                  </optgroup>
+                  <optgroup label="Fantasy, Holidays & Transport">
+                    <option>Unicorns & Rainbows</option><option>Dragons & Castles</option><option>Fairies & Magical Forests</option><option>Pirates</option><option>Robots</option><option>Cars & Trucks</option><option>Trains</option><option>Airplanes</option><option>Christmas</option><option>Halloween</option>
+                  </optgroup>
+                </select>
+                <small class="field-help">50 ready-to-use themes</small>
+              </label>
+            </div>
+
+            <div class="grid two">
+              <label><span>Age Group</span>
+                <select id="age">
+                  <option>3–5 years</option>
+                  <option selected>6–8 years</option>
+                  <option>9–12 years</option>
+                </select>
+              </label>
+              <label><span>Content Language</span>
+                <select id="language">
+                  <option value="English" selected>English</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="grid three">
+              <label><span>Prompts per Generation</span>
+                <select id="pageCount"><option selected>25</option><option>30</option></select>
+              </label>
+              <label><span>Type / Genre</span>
+                <select id="genreType">
+                  <option selected>Classic Educational</option>
+                  <option>Cinematic Adventure</option>
+                  <option>Fantasy Storybook</option>
+                  <option>Documentary Style</option>
+                  <option>Whimsical Cartoon</option>
+                  <option>Cozy Storybook</option>
+                  <option>Science Explorer</option>
+                  <option>Magical World</option>
+                  <option>Realistic Classroom</option>
+                  <option>Vintage Workbook</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="generate-row">
+              <div><strong>25–30 prompts in every generation</strong><small>Consistent content, answer keys, and image prompts</small></div>
+              <button id="generate"><span>✦</span><strong>Generate Prompt Pack</strong></button>
+            </div>
+          </section>
+
+          <aside class="preview">
+            <div class="empty-preview" id="emptyPreview">
+              <div class="book-icon">✦</div>
+              <h3>Your prompt pack will appear here</h3>
+              <p>Choose a product type and theme, then generate 25–30 ready-to-use prompts.</p>
+              <div class="flow"><span>Your Idea</span><i>→</i><span>BrightBook</span><i>→</i><span>Book Plan</span></div>
+            </div>
+
+            <div class="loading hidden" id="loading">
+              <div class="loader"><span></span><span></span><span></span></div>
+              <h3>BrightBook is creating your prompt pack...</h3>
+              <p id="loadingText">Preparing the first prompt batch</p>
+              <div class="progress"><i></i></div>
+              <small>Please keep this window open while your book plan is being prepared.</small>
+            </div>
+
+            <div class="result hidden" id="result">
+              <div class="result-head">
+                <div><small>BOOK PLAN READY</small><h3 id="bookTitle"></h3><p id="bookSubtitle"></p></div>
+                <button id="saveProject">＋ Save</button>
+              </div>
+              <div class="book-meta">
+                <span id="metaAge"></span><span id="metaPages"></span><span id="metaGenre"></span><span>A4</span>
+              </div>
+              <p class="description" id="bookDescription"></p>
+              <div class="tabs">
+                <button class="active" data-tab="pages">Book Pages</button>
+                <button data-tab="cover">Cover & Metadata</button>
+              </div>
+              <div id="pagesTab"><div class="page-list" id="pageList"></div></div>
+              <div class="hidden" id="coverTab">
+                <div class="output-box"><span>COVER IMAGE PROMPT</span><p id="coverPrompt"></p><button data-copy="cover">Copy</button></div>
+                <div class="output-box"><span>KEYWORDS</span><div class="keywords" id="keywords"></div></div>
+              </div>
+              <div class="export-row"><button id="exportJson">↓ Export JSON</button><button id="exportTxt">↓ Export TXT</button></div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="projectsView">
+        <div class="page-intro"><span class="eyebrow">YOUR BOOK LIBRARY</span><h2>Saved Projects</h2><p>Open and continue working on your previously saved activity books.</p></div>
+        <div class="project-grid" id="projectGrid"></div>
+      </section>
+
+      <section class="view" id="templatesView">
+        <div class="page-intro"><span class="eyebrow">QUICK START</span><h2>Template Library</h2><p>Choose a proven idea and start creating immediately.</p></div>
+        <div class="template-grid">
+          <button data-theme="Ocean Animals" data-template="Focus on sea turtles, dolphins, clownfish, and colorful coral reefs">🌊<strong>Ocean Explorer</strong><span>Ages 6–8 · 25 prompts</span></button>
+          <button data-theme="Farm Animals" data-template="Include cows, sheep, chickens, horses, and friendly farm scenes">🐮<strong>Happy Farm</strong><span>Ages 3–5 · 25 prompts</span></button>
+          <button data-theme="Outer Space" data-template="Include planets, rockets, astronauts, and friendly aliens">🚀<strong>Space Adventure</strong><span>Ages 6–8 · 25 prompts</span></button>
+          <button data-theme="Rainforest Animals" data-template="Include monkeys, parrots, jaguars, and fascinating tropical plants">🌴<strong>Rainforest Quest</strong><span>Ages 9–12 · 30 prompts</span></button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast"><b>✓</b><span><strong>Done</strong><small></small></span></div>
+  <script src="app.js"></script>
+</body>
+</html>
