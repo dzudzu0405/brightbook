@@ -168,12 +168,12 @@ function seedBilling() {
   const planCount = db.prepare("SELECT COUNT(*) AS c FROM plans").get().c;
   if (!planCount) {
     const insert = db.prepare("INSERT INTO plans(name,monthly_prompt_limit,price_cents,active) VALUES(?,?,?,1)");
-    insert.run("Starter", 500, 1900);
-    insert.run("Creator", 2500, 4900);
-    insert.run("Pro", 10000, 9900);
-    insert.run("Agency", 50000, 19900);
+    insert.run("Front-End", 500, 2700);
+    insert.run("Pro OTO", 2500, 4700);
+    insert.run("Publishing Kit OTO", 10000, 6700);
+    insert.run("Agency License", 50000, 9700);
   }
-  const demoPlan = db.prepare("SELECT id FROM plans WHERE name=?").get("Creator") || db.prepare("SELECT id FROM plans ORDER BY id LIMIT 1").get();
+  const demoPlan = db.prepare("SELECT id FROM plans WHERE name=?").get("Front-End") || db.prepare("SELECT id FROM plans WHERE name=?").get("Creator") || db.prepare("SELECT id FROM plans ORDER BY id LIMIT 1").get();
   const demo = db.prepare("SELECT id FROM users WHERE email=?").get("demo@brightbook.local");
   if (!demo && demoPlan) {
     db.prepare("INSERT INTO users(email,name,access_token,plan_id,status) VALUES(?,?,?,?,?)")
@@ -198,7 +198,11 @@ function seedBilling() {
     ["advanced.guide-character","Guide Character","Allow recurring character locks.","Advanced Inputs"],
     ["export.save-project","Save Projects","Allow saving generated projects.","Exports"],
     ["export.json","JSON Export","Allow JSON export in the interface.","Exports"],
-    ["export.txt","TXT Export","Allow TXT export in the interface.","Exports"]
+    ["export.txt","TXT Export","Allow TXT export in the interface.","Exports"],
+    ["kit.listing-assets","Listing Kit","Generate KDP, Etsy, keyword, and A+ content assets.","Publishing Kit"],
+    ["kit.quality-check","Quality Checker","Generate a quality score, warnings, and fix suggestions.","Publishing Kit"],
+    ["kit.series-builder","Series Builder","Generate follow-up product ideas for catalog building.","Publishing Kit"],
+    ["kit.launch-checklist","Launch Checklist","Generate a publishing checklist for marketplaces.","Publishing Kit"]
   ];
   for (const [category,items] of THEME_GROUPS) {
     for (const theme of items) features.push([themeFeatureKey(theme),theme,`Allow the ${theme} theme.`,`Themes · ${category}`]);
@@ -210,14 +214,17 @@ function seedBilling() {
   const featureRows = db.prepare("SELECT id,feature_key FROM features").all();
   const byKey = Object.fromEntries(featureRows.map(f => [f.feature_key, f.id]));
   const enable = db.prepare("INSERT OR IGNORE INTO plan_features(plan_id,feature_id,enabled) VALUES(?,?,1)");
-  const starter = ["activity.coloring","activity.word-search","activity.tracing","quantity.25","export.txt"];
-  const creator = starter.concat(["activity.maze","activity.matching","activity.counting","activity.simple-math","activity.learning-worksheet","advanced.custom-direction","advanced.learning-goal","export.save-project","export.json"]);
-  const pro = creator.concat(["activity.educational-story","activity.spot-difference","activity.puzzle","quantity.30","advanced.guide-character"]);
+  const starter = ["activity.coloring","activity.word-search","activity.tracing","quantity.25","export.txt","kit.listing-assets"];
+  const creator = starter.concat(["activity.maze","activity.matching","activity.counting","activity.simple-math","activity.learning-worksheet","advanced.custom-direction","advanced.learning-goal","export.save-project","export.json","kit.quality-check","kit.series-builder"]);
+  const pro = creator.concat(["activity.educational-story","activity.spot-difference","activity.puzzle","quantity.30","advanced.guide-character","kit.launch-checklist"]);
   for (const plan of allPlans) {
     const starterThemes = THEME_GROUPS.slice(0,2).flatMap(([,items])=>items).map(themeFeatureKey);
     const creatorThemes = THEME_GROUPS.slice(0,4).flatMap(([,items])=>items).map(themeFeatureKey);
     const proThemes = THEME_GROUPS.flatMap(([,items])=>items).map(themeFeatureKey);
-    const keys = (plan.name === "Starter" ? starter.concat(starterThemes) : plan.name === "Creator" ? creator.concat(creatorThemes) : pro.concat(proThemes));
+    const planName = String(plan.name).toLowerCase();
+    const isFrontEnd = planName === "starter" || planName === "front-end";
+    const isMiddle = planName === "creator" || planName === "pro oto";
+    const keys = (isFrontEnd ? starter.concat(starterThemes) : isMiddle ? creator.concat(creatorThemes) : pro.concat(proThemes));
     for (const key of keys) if (byKey[key]) enable.run(plan.id, byKey[key]);
   }
 }
@@ -442,6 +449,66 @@ function lockCoverPrompt(prompt,input){
     : "rich professional color palette matched to the selected genre";
   return `Create a premium full-color children's book cover, vertical 2:3 composition.\n\nScene: ${scene}.\n\nCover design: clear central focal character or object, strong readable silhouette, polished publishing layout, title-safe space in the upper-middle, subtitle-safe space below the title, author-name safe space at the bottom, balanced foreground and background, ornate but readable framing, rich theme-specific props and decorative details, ${c.themeDirection}.\n\nColor and mood: ${palette}, cinematic lighting where appropriate, soft depth, magical but child-friendly atmosphere, professional illustrated book cover finish.\n\nStyle: ${input.style}, consistent child-friendly visual language, premium cover art, high-resolution, no cropped important objects.\n\nNegative prompt: no watermark, no logo, no brand characters, no photorealism, no 3D render, no malformed anatomy, no cluttered typography, no illegible random text.`;
 }
+function ensurePublishingKit(book,input){
+  const title=String(book.book_title||`${input.theme} Activity Book`).slice(0,70);
+  const subtitle=String(book.subtitle||`${input.activityType} pages for ${input.age}`).slice(0,120);
+  const theme=String(input.theme||input.topic||"Activity Book");
+  const activity=String(input.activityType||"activity").replace(/-/g," ");
+  const keywords=(Array.isArray(book.keywords)&&book.keywords.length?book.keywords:[theme,`${theme} activity book`,`${activity} book`,`${input.age} activities`]).slice(0,8);
+  if(!book.listing_assets){
+    book.listing_assets={
+      kdp_title:title,
+      kdp_subtitle:subtitle,
+      kdp_description:`${title} is a printable ${activity} product kit for ${input.age}. It includes themed page concepts, clear instructions, answer guidance where needed, and cover direction to help sellers prepare a polished activity book for KDP, Etsy, Gumroad, or classroom marketplaces. Review the pages, create the final artwork, verify print settings, and customize the listing before publishing.`,
+      backend_keywords:Array.from({length:7},(_,i)=>keywords[i]||`${theme} printable activity ${i+1}`),
+      etsy_title:`${title} Printable Activity Book, ${theme} ${activity} Pages, Kids Workbook PDF`,
+      etsy_tags:[theme,"activity book","printable kids","kids worksheet","kdp interior","etsy printable",activity,"homeschool","classroom","coloring pages","busy book","learning fun","digital download"].slice(0,13),
+      short_blurb:`A ${theme} ${activity} kit with page prompts, answer keys, cover direction, and launch-ready marketplace assets.`,
+      a_plus_sections:[
+        `Show the ${theme} theme and age range at a glance.`,
+        "Highlight sample interior pages and the learning benefits.",
+        "Explain what buyers receive and how the printable can be used.",
+        "Show bundle or series options for repeat buyers."
+      ]
+    };
+  }
+  if(!book.quality_check){
+    const warnings=[];
+    if(!book.cover_prompt)warnings.push("Add or review the cover prompt before publishing.");
+    if(!Array.isArray(book.pages)||book.pages.length!==input.pageCount)warnings.push("Page count does not match the selected generation size.");
+    if(input.activityType==="coloring"&&book.pages?.some(p=>/colorful|full-color|shading/i.test(p.image_prompt||"")))warnings.push("Some coloring page prompts may mention color or shading; review before image generation.");
+    book.quality_check={
+      score:Math.max(70,100-(warnings.length*8)),
+      passed_checks:["Product title and subtitle are present.","Page instructions are structured.","Answer guidance is included where relevant.","Cover direction is included.","Marketplace keywords are available."],
+      warnings,
+      fix_suggestions:["Review every page before creating final artwork.","Customize the listing copy to match your marketplace and brand.","Check KDP/Etsy trim size, margins, and commercial-use requirements before upload."]
+    };
+  }
+  if(!Array.isArray(book.series_ideas)||!book.series_ideas.length){
+    book.series_ideas=[
+      `${theme} Beginner Edition for younger learners`,
+      `${theme} Advanced Edition with harder ${activity} tasks`,
+      `${theme} Holiday Special Edition`,
+      `${theme} Large Print Edition`,
+      `${theme} Classroom Worksheet Bundle`,
+      `${theme} Activity Book Series Volume 2`
+    ];
+  }
+  if(!Array.isArray(book.publishing_checklist)||!book.publishing_checklist.length){
+    book.publishing_checklist=[
+      "Review every generated page for accuracy and age fit.",
+      "Create final artwork from each image prompt.",
+      "Check page size, margins, bleed, and gutter before export.",
+      "Create or refine the cover with title-safe space.",
+      "Verify answer keys and remove ambiguous tasks.",
+      "Customize KDP title, subtitle, description, and backend keywords.",
+      "Create Etsy tags, preview images, and mockups if selling digitally.",
+      "Export final interior as a print-ready PDF only after visual QA.",
+      "Publish one product first, then expand into the suggested series."
+    ];
+  }
+  return book;
+}
 function buildPrompt(input, startPage, batchCount, previousTitles=[], previousPages=[]) {
   const pagePlan = Array.from({ length: batchCount }, (_, index) => {
     const activityType = input.activityType;
@@ -511,7 +578,7 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         model:MODEL,prompt:buildPrompt(input,startPage,batchCount,previousTitles,previousPages),stream:false,think:false,format:schema(batchCount),
-        keep_alive:"15m",options:{temperature:.55,num_ctx:6144,num_predict:4200}
+        keep_alive:"15m",options:{temperature:.55,num_ctx:8192,num_predict:7000}
       })
     });
     if(!response.ok)throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0,300)}`);
@@ -524,6 +591,7 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
       image_prompt:lockImagePrompt(page.image_prompt,input)
     }));
     book.cover_prompt=lockCoverPrompt(book.cover_prompt,input);
+    ensurePublishingKit(book,input);
     if(book.pages.length!==batchCount)throw new Error("The content engine did not create every requested prompt. Please try again.");
     return {book,metrics:{totalDuration:result.total_duration,evalCount:result.eval_count}};
   } finally { clearTimeout(timeout); }
