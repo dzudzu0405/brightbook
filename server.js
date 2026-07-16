@@ -405,6 +405,22 @@ function themeVisualDirection(theme=""){
   if(/car|truck|train|airplane/.test(t))return THEME_VISUALS.transport;
   return THEME_VISUALS.holiday;
 }
+function promptSceneTheme(theme=""){
+  const t=String(theme||"activity").toLowerCase();
+  const map=[
+    [/scientists?/, "a friendly science laboratory with microscopes, beakers, plants, safety goggles, blank notebooks, and curious young researchers"],
+    [/police officers?/, "a friendly community safety scene with helpful officers, traffic cones, a patrol car, a crosswalk, and neighborhood helpers"],
+    [/doctors?|nurses?/, "a cheerful clinic scene with child-safe medical tools, caring helpers, a checkup table, and simple health props"],
+    [/firefighters?/, "a friendly fire station scene with safety helmets, hoses, a fire truck, boots, and rescue practice props"],
+    [/teachers?|school/, "a classroom activity scene with books, backpacks, art supplies, a globe without labels, and smiling learners"],
+    [/astronauts?/, "a space explorer scene with astronauts, rockets, planets without labels, stars, control panels without text, and moon rocks"],
+    [/ocean|coral|sea/, "an underwater ocean scene with turtles, dolphins, coral, shells, sea plants, bubbles, and friendly fish"],
+    [/farm/, "a cheerful farm scene with barns without signs, fences, crops, farm tools, and friendly animals"],
+    [/dinosaur/, "a prehistoric nature scene with friendly dinosaurs, large leaves, rocks, volcano shapes, nests, and footprints"],
+    [/pets?/, "a cozy pet-care scene with friendly cats, dogs, bowls without labels, toys, cushions, and simple home details"]
+  ];
+  return map.find(([pattern])=>pattern.test(t))?.[1] || `a detailed child-friendly ${theme} scene with recognizable theme props, charming characters, and simple background details`;
+}
 function visualContract(input){
   input.size = "A4";
   const characterLock=input.guideCharacter
@@ -416,7 +432,7 @@ function visualContract(input){
     characterLock,
     layoutLock:`one standalone A4 portrait printable page, clear focal hierarchy, clean margins, safe trim area, no cropped important objects`,
     negativeLock:input.activityType==="coloring"
-      ? "black-and-white line art only, no color, no grayscale, no shading, no gradients, no shadows, no textures, no text, no watermark, no logo, no border, no photorealism, no 3D render"
+      ? "black-and-white line art only, no color, no grayscale, no shading, no gradients, no shadows, no textures, no title, no words, no letters, no numbers, no labels, no captions, no signage, no watermark, no logo, no border, no photorealism, no 3D render"
       : "no watermark, no logo, no brand characters, no photorealism, no 3D render, no malformed anatomy, no clutter, no cropped important objects, no illegible embedded text"
   };
 }
@@ -477,7 +493,7 @@ function ensurePublishingKit(book,input){
     const warnings=[];
     if(!book.cover_prompt)warnings.push("Add or review the cover prompt before publishing.");
     if(!Array.isArray(book.pages)||book.pages.length!==input.pageCount)warnings.push("Page count does not match the selected generation size.");
-    if(input.activityType==="coloring"&&book.pages?.some(p=>/colorful|full-color|shading/i.test(p.image_prompt||"")))warnings.push("Some coloring page prompts may mention color or shading; review before image generation.");
+    if(input.activityType==="coloring"&&book.pages?.some(p=>/\bfull[- ]color\b|\btitle-safe\b|\btypography\b/i.test(String(p.image_prompt||"").split(/Critical text rule:|Negative prompt:/i)[0])))warnings.push("Some coloring page prompts may mention color or typography; review before image generation.");
     book.quality_check={
       score:Math.max(70,100-(warnings.length*8)),
       passed_checks:["Product title and subtitle are present.","Page instructions are structured.","Answer guidance is included where relevant.","Cover direction is included.","Marketplace keywords are available."],
@@ -600,10 +616,22 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
 function fallbackPage(input,pageNumber){
   const theme=input.theme||input.topic||"Activity";
   const activity=String(input.activityType||"activity").replace(/-/g," ");
-  const topicBits=["explorer","challenge","practice","review","discovery","mission","workshop","adventure","bonus","recap"];
+  const topicBits=["explorer","discovery","workshop","adventure","mission","lab","field trip","collection","teamwork","creative scene"];
   const focus=topicBits[(pageNumber-1)%topicBits.length];
-  const title=`${theme} ${focus} ${pageNumber}`;
-  const commonPrompt=`Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber} with clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Negative prompt: no watermark, no logo, no brand characters, no clutter, no cropped important objects.`;
+  const title=`${theme} ${focus.replace(/\b\w/g,c=>c.toUpperCase())}`;
+  const sceneTheme=promptSceneTheme(theme);
+  const sceneSeeds=[
+    `a friendly main character exploring ${sceneTheme} with 3-5 large foreground objects and small background details`,
+    `a cheerful group scene in ${sceneTheme}, with tools, props, and setting elements arranged with open coloring spaces`,
+    `a playful close-up scene with one central subject, supporting objects, and decorative theme details around the page`,
+    `a wide activity scene with clear foreground, middle ground, and background, designed for children to color`,
+    `a calm storybook scene with expressive characters, clean silhouettes, and many simple enclosed shapes`
+  ];
+  const sceneSeed=sceneSeeds[(pageNumber-1)%sceneSeeds.length];
+  const coloringPrompt=`Create a premium black-and-white coloring book illustration for children, vertical A4 portrait composition.\n\nScene: ${sceneSeed}. Make the page feel like a polished commercial coloring book interior, not a worksheet and not a poster. Use one clear focal scene with balanced composition, charming child-safe characters or objects, expressive faces where relevant, recognizable props, and plenty of fun details for coloring.\n\nLine art requirements: crisp clean black outlines, smooth confident strokes, closed shapes, large colorable areas, moderate detail, uncluttered spacing, white background, no filled black areas except tiny pupils if needed, no gray shading, no crosshatching, no gradients, no textures, no screen tones.\n\nCritical text rule: do not include any title, heading, caption, label, signage, alphabet letters, numbers, speech bubbles, random symbols, or readable/unreadable text anywhere in the image.\n\nNegative prompt: text, words, letters, numbers, typography, title, subtitle, captions, labels, signs, watermark, logo, border, frame, color, grayscale, shading, gradients, shadows, photorealism, 3D render, messy anatomy, extra fingers, cropped subjects, clutter.`;
+  const commonPrompt=input.activityType==="coloring"
+    ? coloringPrompt
+    : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber} with clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, and cropped important objects.`;
   const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Complete the ${activity} activity using the ${theme} theme.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[`${theme} scene ${pageNumber}`,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
   if(input.activityType==="word-search"){
     const words=[theme.split(/\s+/)[0]||"OCEAN","FIND","LEARN","PLAY","SMART","FOCUS","WORD","BOOK"];
