@@ -215,8 +215,8 @@ function seedBilling() {
   const featureRows = db.prepare("SELECT id,feature_key FROM features").all();
   const byKey = Object.fromEntries(featureRows.map(f => [f.feature_key, f.id]));
   const enable = db.prepare("INSERT OR IGNORE INTO plan_features(plan_id,feature_id,enabled) VALUES(?,?,1)");
-  const starter = ["activity.coloring","activity.word-search","activity.tracing","quantity.25","export.txt","kit.listing-assets"];
-  const creator = starter.concat(["activity.maze","activity.matching","activity.counting","activity.simple-math","activity.learning-worksheet","advanced.custom-direction","advanced.learning-goal","export.save-project","export.json","kit.quality-check","kit.series-builder"]);
+  const starter = ["activity.coloring","activity.word-search","activity.tracing","quantity.25","export.txt","export.json","kit.listing-assets"];
+  const creator = starter.concat(["activity.maze","activity.matching","activity.counting","activity.simple-math","activity.learning-worksheet","advanced.custom-direction","advanced.learning-goal","export.save-project","kit.quality-check","kit.series-builder"]);
   const pro = creator.concat(["activity.educational-story","activity.spot-difference","activity.puzzle","quantity.30","advanced.guide-character","kit.launch-checklist"]);
   for (const plan of allPlans) {
     const starterThemes = THEME_GROUPS.slice(0,2).flatMap(([,items])=>items).map(themeFeatureKey);
@@ -227,6 +227,10 @@ function seedBilling() {
     const isMiddle = planName === "creator" || planName === "pro oto";
     const keys = (isFrontEnd ? starter.concat(starterThemes) : isMiddle ? creator.concat(creatorThemes) : pro.concat(proThemes));
     for (const key of keys) if (byKey[key]) enable.run(plan.id, byKey[key]);
+  }
+  for (const plan of allPlans) {
+    const planName = String(plan.name).toLowerCase();
+    if ((planName === "starter" || planName === "front-end") && byKey["export.json"]) enable.run(plan.id, byKey["export.json"]);
   }
 }
 seedBilling();
