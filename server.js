@@ -425,6 +425,65 @@ function promptSceneTheme(theme=""){
   ];
   return map.find(([pattern])=>pattern.test(t))?.[1] || `a detailed child-friendly ${theme} scene with recognizable theme props, charming characters, and simple background details`;
 }
+function themeScenePool(theme=""){
+  const t=String(theme||"activity").toLowerCase();
+  if(/farm/.test(t))return [
+    "a gentle cow standing beside a wooden barn, hay bales, a milk pail, fence posts, grass tufts, and a sunny farmyard",
+    "three fluffy sheep grazing in a pasture with rolling hills, a small gate, wildflowers, clouds, and a distant barn",
+    "a cheerful pig in a clean straw pen with a trough, mud puddle shapes, fence rails, apples, and farm buckets",
+    "a chicken coop scene with hens, chicks, nesting boxes, corn kernels, a water dish, and a rooster on a fence",
+    "a friendly horse looking over a stable door with horseshoes, hay bundles, saddle blankets, carrots, and barn beams",
+    "ducks swimming in a small farm pond with reeds, lily pads, ducklings, stones, and a wooden footbridge",
+    "a curious goat standing near a fence with tin cans, grass, a small shed, climbing rocks, and leafy branches",
+    "a farm dog watching over animals near a gate with paw prints, a feed sack without labels, and a wagon wheel",
+    "a farm cat sleeping on hay beside a lantern, pumpkins, baskets, barn planks, and tiny mice peeking out",
+    "a donkey carrying flower baskets along a farm path with fence rails, shrubs, and a farmhouse in the distance",
+    "a tractor parked beside hay bales with chickens nearby, tire tracks, crates, farm tools, and open sky",
+    "a market basket scene with eggs, carrots, apples, corn, a watering can, and small farm animals around it",
+    "a baby calf nuzzling its mother near a barn door with straw, buckets, butterflies, and soft pasture details",
+    "a lamb jumping over a small log in a meadow with daisies, fence posts, clouds, and a woolly sheep family",
+    "piglets playing around a clean wooden trough with straw piles, round stones, simple flowers, and a low fence",
+    "a rooster greeting the morning beside a chicken coop with hens, chicks, corn stalks, and sunrise shapes",
+    "a pony in a paddock with a brush, apple basket, fence, stable window, horseshoe decoration, and grass patches",
+    "geese walking in a line near a pond with reeds, footprints, a small bridge, and farmyard plants",
+    "goats climbing on wooden platforms inside a safe farm play yard with buckets, leaves, and a small shelter",
+    "a farmer child feeding animals with a bucket, surrounded by cow, sheep, chicken, and goat in a tidy barnyard",
+    "a barn interior with animal stalls, hayloft ladder, feed buckets, friendly animals peeking out, and clean open spaces",
+    "a vegetable garden beside the animal barn with rabbits, chickens, watering can, carrots, leafy plants, and fence rails",
+    "a farmyard parade with cow, horse, sheep, pig, duck, and chicken walking along a dirt path",
+    "a cozy nighttime barn scene with sleeping animals, moon visible through a window, hay piles, and quiet farm details",
+    "a spring farm scene with baby animals, flowers, butterflies, fresh grass, and a welcoming barn gate"
+  ];
+  if(/scientists?/.test(t))return [
+    "two curious young scientists using a microscope with beakers, blank notebooks, safety goggles, plant samples, and tidy shelves",
+    "a child scientist observing a sprouting plant beside test tubes, measuring cups without numbers, leaves, and lab tools",
+    "a friendly lab table scene with magnifying glass, crystals, beakers, goggles, blank cards, and simple science props",
+    "a science classroom experiment with children mixing safe liquids, bubbles, jars without labels, and neatly arranged tools",
+    "a young researcher looking at stars through a telescope near a desk with planets, books without text, and moon shapes"
+  ];
+  return [
+    `${promptSceneTheme(theme)} with one clear central character and 3-5 large foreground props`,
+    `${promptSceneTheme(theme)} with a cheerful group scene, simple background, and open coloring spaces`,
+    `${promptSceneTheme(theme)} shown as a close-up scene with recognizable props and child-safe details`,
+    `${promptSceneTheme(theme)} arranged as a wide storybook scene with foreground, middle ground, and background`,
+    `${promptSceneTheme(theme)} with expressive characters, clean silhouettes, and simple decorative details`
+  ];
+}
+function sceneTitle(theme,scene,pageNumber){
+  const t=String(theme||"Activity");
+  if(/farm/i.test(t)){
+    const names=[
+      "Cow at the Barn","Sheep in the Pasture","Pig in the Straw Pen","Chicken Coop Friends","Horse at the Stable",
+      "Ducks at the Pond","Goat by the Fence","Farm Dog Helper","Cat in the Hay","Donkey on the Farm Path",
+      "Tractor and Hay Bales","Farm Market Basket","Baby Calf and Mother","Jumping Lamb","Playful Piglets",
+      "Rooster Morning","Pony Paddock","Geese by the Pond","Goat Play Yard","Feeding Time",
+      "Inside the Barn","Garden by the Barn","Farmyard Parade","Nighttime Barn","Spring Baby Animals"
+    ];
+    return `${t}: ${names[(pageNumber-1)%names.length]}`;
+  }
+  const titleWords=String(scene||"").split(/\s+/).filter(word=>!/^(a|an|the|with|and|in|on|near|beside|inside|around|of|to|for|its)$/i.test(word)).slice(0,4).join(" ");
+  return `${t}: ${titleWords.replace(/[^\w\s-]/g,"").replace(/\b\w/g,c=>c.toUpperCase())}`;
+}
 function visualContract(input){
   input.size = "A4";
   const characterLock=input.guideCharacter
@@ -620,23 +679,14 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
 function fallbackPage(input,pageNumber){
   const theme=input.theme||input.topic||"Activity";
   const activity=String(input.activityType||"activity").replace(/-/g," ");
-  const topicBits=["explorer","discovery","workshop","adventure","mission","lab","field trip","collection","teamwork","creative scene"];
-  const focus=topicBits[(pageNumber-1)%topicBits.length];
-  const title=`${theme} ${focus.replace(/\b\w/g,c=>c.toUpperCase())}`;
-  const sceneTheme=promptSceneTheme(theme);
-  const sceneSeeds=[
-    `a friendly main character exploring ${sceneTheme} with 3-5 large foreground objects and small background details`,
-    `a cheerful group scene in ${sceneTheme}, with tools, props, and setting elements arranged with open coloring spaces`,
-    `a playful close-up scene with one central subject, supporting objects, and decorative theme details around the page`,
-    `a wide activity scene with clear foreground, middle ground, and background, designed for children to color`,
-    `a calm storybook scene with expressive characters, clean silhouettes, and many simple enclosed shapes`
-  ];
-  const sceneSeed=sceneSeeds[(pageNumber-1)%sceneSeeds.length];
+  const scenePool=themeScenePool(theme);
+  const sceneSeed=scenePool[(pageNumber-1)%scenePool.length];
+  const title=sceneTitle(theme,sceneSeed,pageNumber);
   const coloringPrompt=`Create a premium black-and-white coloring book illustration for children, vertical A4 portrait composition.\n\nScene: ${sceneSeed}. Make the page feel like a polished commercial coloring book interior, not a worksheet and not a poster. Use one clear focal scene with balanced composition, charming child-safe characters or objects, expressive faces where relevant, recognizable props, and plenty of fun details for coloring.\n\nLine art requirements: crisp clean black outlines, smooth confident strokes, closed shapes, large colorable areas, moderate detail, uncluttered spacing, white background, no filled black areas except tiny pupils if needed, no gray shading, no crosshatching, no gradients, no textures, no screen tones.\n\nCritical text rule: do not include any title, heading, caption, label, signage, alphabet letters, numbers, speech bubbles, random symbols, or readable/unreadable text anywhere in the image.\n\nNegative prompt: text, words, letters, numbers, typography, title, subtitle, captions, labels, signs, watermark, logo, border, frame, color, grayscale, shading, gradients, shadows, photorealism, 3D render, messy anatomy, extra fingers, cropped subjects, clutter.`;
   const commonPrompt=input.activityType==="coloring"
     ? coloringPrompt
     : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber} with clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, and cropped important objects.`;
-  const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Complete the ${activity} activity using the ${theme} theme.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[`${theme} scene ${pageNumber}`,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
+  const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Color the ${theme.toLowerCase()} scene with care and notice the farm details.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[sceneSeed,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
   if(input.activityType==="word-search"){
     const words=[theme.split(/\s+/)[0]||"OCEAN","FIND","LEARN","PLAY","SMART","FOCUS","WORD","BOOK"];
     return {...base,instruction:`Find the hidden ${theme} words in the grid.`,content_items:[`Words: ${words.join(", ")}`,"Grid: F I N D P L A Y / L E A R N B O O / S M A R T W O R / F O C U S D K S"],answer:`Hidden words: ${words.join(", ")}.`};
@@ -662,6 +712,15 @@ function generateFallbackBook(input,reason=""){
     pages
   };
   ensurePublishingKit(book,input);
+  const promptTexts=pages.map(p=>`${p.title} ${p.instruction} ${p.content_items?.join(" ")} ${p.image_prompt}`.toLowerCase());
+  const themeKey=String(input.theme||"").toLowerCase();
+  if(/farm/.test(themeKey)){
+    const farmTerms=/farm|barn|cow|sheep|pig|chicken|horse|duck|goat|tractor|hay|pasture|stable|coop|pond|fence|calf|lamb|rooster|geese|vegetable|animal/;
+    const weakPages=promptTexts.map((text,index)=>farmTerms.test(text)?null:index+1).filter(Boolean);
+    if(weakPages.length)book.quality_check.warnings.unshift(`Theme coverage warning: pages ${weakPages.join(", ")} may not clearly reference farm animals.`);
+  }
+  const duplicateTitles=pages.map(p=>p.title).filter((title,index,arr)=>arr.indexOf(title)!==index);
+  if(duplicateTitles.length)book.quality_check.warnings.unshift("Some generated page titles are duplicated; review the series before publishing.");
   const fastMode = /fast product kit mode/i.test(reason);
   book.quality_check.warnings.unshift(fastMode?"Generated with Fast Product Kit mode for immediate output. Enable USE_OLLAMA_GENERATION=1 for slower local AI drafting.":reason?`Generated with the quick fallback because the local model was slow or unavailable: ${reason}`:"Generated with the quick fallback workflow.");
   book.quality_check.score=Math.min(book.quality_check.score,82);
