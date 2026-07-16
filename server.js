@@ -425,6 +425,65 @@ function promptSceneTheme(theme=""){
   ];
   return map.find(([pattern])=>pattern.test(t))?.[1] || `a detailed child-friendly ${theme} scene with recognizable theme props, charming characters, and simple background details`;
 }
+function themeElements(theme=""){
+  const t=String(theme||"activity").toLowerCase();
+  const packs=[
+    [/ocean|coral|sea/,["sea turtle","dolphin","clownfish","octopus","seahorse","crab","starfish","whale"],["coral reef","sandy seabed","kelp forest","tide pool","underwater cave"],["shells","bubbles","sea plants","smooth stones","treasure-free chest","waves"]],
+    [/safari/,["lion","elephant","giraffe","zebra","rhino","meerkat","cheetah","hippo"],["savanna grassland","watering hole","acacia grove","safari trail","sunny wildlife park"],["tall grass","binoculars","jeep without logos","rocks","bushes","clouds"]],
+    [/woodland/,["deer","fox","owl","rabbit","squirrel","hedgehog","raccoon","songbird"],["quiet forest","mushroom grove","leafy trail","hollow log clearing","acorn meadow"],["acorns","mushrooms","fallen leaves","tree stumps","ferns","berries"]],
+    [/rainforest/,["monkey","toucan","jaguar","tree frog","sloth","parrot","butterfly","tapir"],["tropical canopy","vine-covered path","rainforest river","giant leaf garden","waterfall clearing"],["vines","ferns","big leaves","orchids","fruit","raindrops"]],
+    [/arctic/,["polar bear","penguin","seal","arctic fox","snowy owl","walrus","orca","reindeer"],["snowy ice field","igloo village without signs","frozen shore","aurora sky","iceberg scene"],["snowflakes","ice blocks","mittens","fish","pine trees","sled tracks"]],
+    [/dinosaur/,["triceratops","stegosaurus","brachiosaurus","t-rex","ankylosaurus","parasaurolophus","baby dinosaur","pteranodon"],["prehistoric valley","fern forest","volcano landscape","dinosaur nest","rocky river"],["fossils","giant leaves","eggs","rocks","footprints","clouds"]],
+    [/insect|butterfl/,["butterfly","bee","ladybug","dragonfly","caterpillar","ant","beetle","grasshopper"],["flower garden","leafy meadow","bug hotel","pond edge","vegetable patch"],["flowers","leaves","honeycomb","mushrooms","dew drops","stems"]],
+    [/bird/,["owl","parrot","sparrow","eagle","duck","flamingo","peacock","robin"],["tree branch","nest scene","bird garden","pond shore","forest clearing"],["feathers","eggs","leaves","berries","clouds","flowers"]],
+    [/pet/,["puppy","kitten","hamster","rabbit","goldfish","parakeet","turtle","guinea pig"],["cozy pet room","backyard play area","pet care corner","sunny window spot","garden path"],["toys","blank bowls","cushions","paw prints","brushes","blank tags"]],
+    [/community helper/,["mail carrier","librarian","crossing guard","bus driver","sanitation worker","park worker","shop helper","community volunteer"],["friendly neighborhood","library corner","crosswalk","bus stop","park path"],["bags without logos","books without text","cones","benches","trees","recycling bins without labels"]],
+    [/doctor|nurse/,["doctor","nurse","patient child","clinic helper","dentist","paramedic","care team","health teacher"],["cheerful clinic","checkup room","health corner","waiting area","medical station"],["stethoscope","bandage","blank chart","toy bear","sink","first-aid box without labels"]],
+    [/firefighter/,["firefighter","fire truck","rescue dog","helmeted helper","ladder team","hose team","station crew","safety teacher"],["fire station","training yard","truck bay","safe rescue practice scene","neighborhood safety day"],["hose","helmet","boots","ladder","hydrant","cones"]],
+    [/police/,["police officer","crossing guard","community helper","patrol car","bike officer","safety team","friendly officer","traffic helper"],["crosswalk","community park","neighborhood street","school safety zone","traffic safety corner"],["cones","badge shapes without text","walkie-talkie","traffic lights","bicycle","blank notebook"]],
+    [/teacher|school/,["teacher","student group","reader child","art student","science student","class helper","music student","librarian"],["classroom","reading corner","art table","school garden","library nook"],["books without text","pencils","backpacks","blank board","globe without labels","crayons"]],
+    [/construction/,["builder","crane operator","architect child","toolbox helper","dump truck","bulldozer","bricklayer","safety worker"],["construction site","tool shed","road work zone","building frame","materials yard"],["helmet","cones","bricks","tools","crane","wood planks"]],
+    [/farmer/,["farmer","tractor driver","garden helper","barn worker","crop picker","animal caretaker","market helper","watering helper"],["crop field","barnyard","vegetable garden","orchard","farm market table"],["tractor","watering can","baskets","hay","fence","blank crates"]],
+    [/chef|baker/,["chef","baker","kitchen helper","pastry maker","soup cook","bread maker","cake decorator","apron child"],["cozy kitchen","bakery counter","mixing table","oven corner","picnic prep table"],["mixing bowl","spoon","rolling pin","bread","cupcakes","blank recipe card"]],
+    [/scientist/,["young scientist","microscope explorer","plant researcher","crystal observer","lab helper","telescope student","experiment team","goggle-wearing child"],["science laboratory","classroom lab","plant table","crystal station","observation desk"],["microscope","beakers","blank notebooks","goggles","plant samples","magnifying glass"]],
+    [/astronaut|space|solar/,["astronaut","rocket explorer","moon rover","space student","planet observer","satellite helper","alien-free explorer","telescope child"],["moon surface","rocket launch pad","space station room","planet trail","starry sky"],["planets without labels","stars","moon rocks","rocket","control panels without text","helmets"]],
+    [/weather|season/,["weather watcher","raincoat child","snow helper","sunny day explorer","windy kite flyer","cloud observer","season tree","umbrella child"],["weather station without labels","park path","seasonal garden","rain puddle scene","snowy yard"],["clouds","raindrops","snowflakes","leaves","sun shapes","umbrellas"]],
+    [/human body|healthy|safety|routine|habit/,["healthy child","exercise helper","handwashing child","sleepy bedtime helper","safety watcher","toothbrushing child","snack helper","routine chart without text"],["bathroom sink","playground","kitchen table","bedroom corner","clinic classroom"],["toothbrush","soap bubbles","fruit","water bottle","sneakers","blank checklist"]],
+    [/plant|garden/,["gardener child","flower helper","seed planter","watering helper","butterfly visitor","vegetable picker","tree planter","sprout observer"],["flower garden","vegetable patch","greenhouse","orchard","potting table"],["watering can","seed packets without text","leaves","pots","tools","butterflies"]],
+    [/volcano/,["young geologist","volcano explorer","rock collector","safety observer","mountain hiker","fossil finder","lava watcher","science guide"],["volcano landscape","rocky trail","geology table","mountain valley","safe observation hill"],["rocks","crystals","steam clouds","lava shapes","backpack","magnifying glass"]],
+    [/camping/,["camper child","tent helper","trail explorer","lantern carrier","backpack kid","nature observer","map helper","campfire sitter"],["forest campsite","tent area","lake trail","mountain camp","woodland clearing"],["tent","lantern","backpack","logs","stars","blank map"]],
+    [/treasure/,["adventurer child","map explorer","compass helper","island walker","cave explorer","clue finder","bridge crosser","chest opener"],["island path","jungle trail","safe cave","sandy beach","wooden bridge"],["compass","map without letters","coins","chest","vines","rocks"]],
+    [/alphabet/,["letter explorer","classroom helper","book friend","pencil character","reading child","library helper","alphabet blocks without letters","teacher owl"],["reading corner","classroom table","library nook","book garden","learning rug"],["books without text","pencils","blank cards","blocks without letters","stars","backpacks"]],
+    [/number/,["counting child","number explorer","math helper","block stacker","abacus friend","counting animals","shape counter","market helper"],["classroom table","counting corner","toy shelf","market basket","learning rug"],["blocks without printed numbers","beads","apples","stars","blank cards","counters"]],
+    [/shape/,["shape explorer","circle friend","square builder","triangle climber","pattern helper","block child","art student","shape sorter"],["art table","classroom rug","block city","playroom","pattern garden"],["circles","squares","triangles","stars","blank cards","crayons"]],
+    [/color/,["paint helper","rainbow friend","art student","crayon kid","palette explorer","flower painter","butterfly painter","studio helper"],["art studio","flower garden","classroom table","rainbow meadow","craft corner"],["paintbrushes","blank palette","crayons","flowers","butterflies","jars without labels"]],
+    [/opposite/,["big and small pair","up and down scene","open and closed helper","day and night pair","fast and slow racers","happy and sad faces","near and far scene","full and empty baskets"],["learning rug","playground","classroom corner","storybook scene","park path"],["blank cards","baskets","balls","blocks","doors without signs","clouds"]],
+    [/emotion|friendship|kindness/,["smiling friend","sharing child","helping buddy","kindness helper","feeling face character","comforting friend","teamwork pair","thank-you helper"],["playground","classroom rug","park bench","story corner","garden path"],["hearts without text","toys","flowers","blank cards","benches","books without words"]],
+    [/unicorn|rainbow/,["unicorn","rainbow pony","cloud friend","star helper","magical foal","flower crown unicorn","moon unicorn","meadow unicorn"],["rainbow meadow","cloud garden","starry hill","magical forest","flower field"],["stars","clouds","flowers","sparkles","mushrooms","crescent moon"]],
+    [/dragon|castle/,["friendly dragon","castle guard","young knight","princess explorer","tower helper","shield bearer","baby dragon","bridge walker"],["castle courtyard","tower room","dragon meadow","stone bridge","royal garden"],["shields without symbols","flags without marks","stones","flowers","treasure-free chest","clouds"]],
+    [/fair/,["fairy","forest sprite","mushroom friend","flower fairy","butterfly helper","wand holder","tiny gardener","moon fairy"],["magical forest","mushroom village","flower meadow","fairy garden","glowing pond"],["mushrooms","flowers","wings","stars","leaves","sparkles"]],
+    [/pirate/,["pirate child","ship helper","parrot friend","island explorer","sailor kid","treasure map holder","captain child","anchor helper"],["pirate ship","island beach","dock scene","jungle trail","safe cave"],["anchor","ship wheel","map without text","coins","palm trees","sails"]],
+    [/robot/,["friendly robot","gear helper","inventor child","robot pet","workshop bot","space robot","cleaning robot","builder bot"],["robot workshop","gear room","space lab","invention table","city sidewalk"],["gears","bolts","buttons without labels","wires","tools","blank panels"]],
+    [/car|truck/,["race car","pickup truck","fire truck toy","delivery van","mechanic child","monster truck","tow truck","family car"],["garage","road scene","car wash","traffic park","repair shop"],["wheels","cones","tools","blank signs","road lines","clouds"]],
+    [/train/,["steam train","conductor child","passenger car","freight train","station helper","toy train","mountain train","subway-style train"],["train station","railroad track","bridge crossing","mountain railway","platform without signs"],["tracks","wheels","clouds","suitcases","signals without text","trees"]],
+    [/airplane/,["airplane","pilot child","airport helper","cloud flyer","hangar mechanic","paper plane friend","helicopter","runway crew"],["runway","airport hangar","cloud sky","control tower without text","travel scene"],["clouds","wings","luggage without labels","cones","tools","stars"]],
+    [/christmas/,["holiday tree","gift helper","snow child","stocking friend","gingerbread baker","reindeer","snowman","ornament maker"],["cozy living room","snowy yard","holiday kitchen","tree corner","winter street"],["gifts","ornaments","snowflakes","stockings","cookies","stars"]],
+    [/halloween/,["pumpkin friend","costume child","friendly ghost","bat buddy","candy helper","black cat","witch hat character","spooky tree"],["pumpkin patch","costume party","friendly haunted yard","moonlit path","candy table"],["pumpkins","bats","candy","leaves","lanterns","stars"]]
+  ];
+  const found=packs.find(([pattern])=>pattern.test(t));
+  if(found)return {subjects:found[1],settings:found[2],props:found[3]};
+  return {subjects:[`${theme} explorer`,`${theme} helper`,`${theme} friend`,`${theme} scene`,`${theme} character`],settings:[promptSceneTheme(theme),"activity corner","storybook setting","playful learning scene","outdoor scene"],props:["simple props","background details","decorative shapes","open spaces","friendly objects","nature details"]};
+}
+function buildScenePoolFromElements(elements){
+  return Array.from({length:25},(_,index)=>{
+    const subject=elements.subjects[index%elements.subjects.length];
+    const setting=elements.settings[Math.floor(index/elements.subjects.length)%elements.settings.length];
+    const p1=elements.props[index%elements.props.length];
+    const p2=elements.props[(index+2)%elements.props.length];
+    const p3=elements.props[(index+4)%elements.props.length];
+    return `${subject} in a ${setting} with ${p1}, ${p2}, ${p3}, clear foreground shapes, and child-friendly background details`;
+  });
+}
 function themeScenePool(theme=""){
   const t=String(theme||"activity").toLowerCase();
   if(/farm/.test(t))return [
@@ -454,20 +513,7 @@ function themeScenePool(theme=""){
     "a cozy nighttime barn scene with sleeping animals, moon visible through a window, hay piles, and quiet farm details",
     "a spring farm scene with baby animals, flowers, butterflies, fresh grass, and a welcoming barn gate"
   ];
-  if(/scientists?/.test(t))return [
-    "two curious young scientists using a microscope with beakers, blank notebooks, safety goggles, plant samples, and tidy shelves",
-    "a child scientist observing a sprouting plant beside test tubes, measuring cups without numbers, leaves, and lab tools",
-    "a friendly lab table scene with magnifying glass, crystals, beakers, goggles, blank cards, and simple science props",
-    "a science classroom experiment with children mixing safe liquids, bubbles, jars without labels, and neatly arranged tools",
-    "a young researcher looking at stars through a telescope near a desk with planets, books without text, and moon shapes"
-  ];
-  return [
-    `${promptSceneTheme(theme)} with one clear central character and 3-5 large foreground props`,
-    `${promptSceneTheme(theme)} with a cheerful group scene, simple background, and open coloring spaces`,
-    `${promptSceneTheme(theme)} shown as a close-up scene with recognizable props and child-safe details`,
-    `${promptSceneTheme(theme)} arranged as a wide storybook scene with foreground, middle ground, and background`,
-    `${promptSceneTheme(theme)} with expressive characters, clean silhouettes, and simple decorative details`
-  ];
+  return buildScenePoolFromElements(themeElements(theme));
 }
 function sceneTitle(theme,scene,pageNumber){
   const t=String(theme||"Activity");
@@ -481,7 +527,7 @@ function sceneTitle(theme,scene,pageNumber){
     ];
     return `${t}: ${names[(pageNumber-1)%names.length]}`;
   }
-  const titleWords=String(scene||"").split(/\s+/).filter(word=>!/^(a|an|the|with|and|in|on|near|beside|inside|around|of|to|for|its)$/i.test(word)).slice(0,4).join(" ");
+  const titleWords=String(scene||"").split(/\s+/).filter(word=>!/^(a|an|the|with|and|in|on|near|beside|inside|around|of|to|for|its|clear|foreground|shapes|child-friendly|background|details)$/i.test(word)).slice(0,7).join(" ");
   return `${t}: ${titleWords.replace(/[^\w\s-]/g,"").replace(/\b\w/g,c=>c.toUpperCase())}`;
 }
 function visualContract(input){
