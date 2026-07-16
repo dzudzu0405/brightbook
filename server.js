@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 4180);
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OLLAMA_MODEL || "gemma3:4b";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "brightbook-admin";
+const USE_OLLAMA_GENERATION = process.env.USE_OLLAMA_GENERATION === "1";
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 const db = new DatabaseSync(path.join(ROOT, "data", "brightbook.db"));
 db.exec(`
@@ -571,7 +572,7 @@ RULES
 }
 async function generateBatch(input,startPage,batchCount,previousTitles,previousPages) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 240000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch(`${OLLAMA_URL}/api/generate`, {
       method:"POST",signal:controller.signal,
@@ -596,7 +597,47 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
     return {book,metrics:{totalDuration:result.total_duration,evalCount:result.eval_count}};
   } finally { clearTimeout(timeout); }
 }
+function fallbackPage(input,pageNumber){
+  const theme=input.theme||input.topic||"Activity";
+  const activity=String(input.activityType||"activity").replace(/-/g," ");
+  const topicBits=["explorer","challenge","practice","review","discovery","mission","workshop","adventure","bonus","recap"];
+  const focus=topicBits[(pageNumber-1)%topicBits.length];
+  const title=`${theme} ${focus} ${pageNumber}`;
+  const commonPrompt=`Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber} with clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Negative prompt: no watermark, no logo, no brand characters, no clutter, no cropped important objects.`;
+  const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Complete the ${activity} activity using the ${theme} theme.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[`${theme} scene ${pageNumber}`,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
+  if(input.activityType==="word-search"){
+    const words=[theme.split(/\s+/)[0]||"OCEAN","FIND","LEARN","PLAY","SMART","FOCUS","WORD","BOOK"];
+    return {...base,instruction:`Find the hidden ${theme} words in the grid.`,content_items:[`Words: ${words.join(", ")}`,"Grid: F I N D P L A Y / L E A R N B O O / S M A R T W O R / F O C U S D K S"],answer:`Hidden words: ${words.join(", ")}.`};
+  }
+  if(input.activityType==="tracing"){
+    return {...base,instruction:`Trace the ${theme} vocabulary words, then write them once on your own.`,content_items:[`Trace: ${theme}`,`Trace: learn`,`Trace: explore`],answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly."};
+  }
+  if(input.activityType==="maze"){
+    return {...base,instruction:`Help the character move through the ${theme} maze from start to finish.`,content_items:["Start: top left","Goal: bottom right","Route: R, R, D, D, R, D"],answer:"Solution route: R, R, D, D, R, D."};
+  }
+  return base;
+}
+function generateFallbackBook(input,reason=""){
+  const theme=input.theme||input.topic||"Activity";
+  const activity=String(input.activityType||"activity").replace(/-/g," ");
+  const pages=Array.from({length:input.pageCount},(_,index)=>fallbackPage(input,index+1));
+  const book={
+    book_title:`${theme} ${activity.replace(/\b\w/g,c=>c.toUpperCase())} Kit`,
+    subtitle:`Printable ${activity} pages for ${input.age}`,
+    description:`A quick product kit for ${theme} ${activity} pages with instructions, answer guidance, cover direction, listing assets, and a launch checklist.`,
+    cover_prompt:lockCoverPrompt(`A polished ${theme} ${activity} activity book cover with friendly child-safe visuals, clear title-safe space, and marketplace-ready composition`,input),
+    keywords:[theme,`${theme} ${activity}`,`${activity} book`,"printable activity","kids workbook","KDP interior","Etsy printable","learning pages"],
+    pages
+  };
+  ensurePublishingKit(book,input);
+  const fastMode = /fast product kit mode/i.test(reason);
+  book.quality_check.warnings.unshift(fastMode?"Generated with Fast Product Kit mode for immediate output. Enable USE_OLLAMA_GENERATION=1 for slower local AI drafting.":reason?`Generated with the quick fallback because the local model was slow or unavailable: ${reason}`:"Generated with the quick fallback workflow.");
+  book.quality_check.score=Math.min(book.quality_check.score,82);
+  return {book,metrics:{totalDuration:0,evalCount:0,batches:0,fallback:true,reason}};
+}
 async function generateBook(input) {
+  if(!USE_OLLAMA_GENERATION) return generateFallbackBook(input,"Fast product kit mode is enabled.");
+  try {
   const batchSize=5,pages=[],titles=[];let metadata=null,totalDuration=0,evalCount=0;
   for(let startPage=1;startPage<=input.pageCount;startPage+=batchSize){
     const batchCount=Math.min(batchSize,input.pageCount-startPage+1);
@@ -624,6 +665,10 @@ async function generateBook(input) {
   }
   if(pages.length!==input.pageCount)throw new Error(`The content engine created ${pages.length}/${input.pageCount} prompts. Please generate again.`);
   return {book:{...metadata,pages},metrics:{totalDuration,evalCount,batches:Math.ceil(input.pageCount/batchSize)}};
+  } catch(e) {
+    console.warn("Using fallback product kit generator:", e.message);
+    return generateFallbackBook(input,e.name==="AbortError"?"The content engine took too long to respond.":e.message);
+  }
 }
 function normalizeTitle(title=""){
   return String(title).toLowerCase().replace(/[^a-z0-9]+/g," ").trim();

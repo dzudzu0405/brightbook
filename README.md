@@ -27,11 +27,14 @@ Open:
 ```powershell
 $env:OLLAMA_MODEL="gemma3:4b"
 $env:OLLAMA_URL="http://127.0.0.1:11434"
+$env:USE_OLLAMA_GENERATION="1"
 $env:PORT="4180"
 node server.js
 ```
 
 The application does not call the OpenAI API. Project data is stored in `data/brightbook.db`.
+
+By default, BrightBook uses Fast Product Kit mode so product kits generate immediately. Set `USE_OLLAMA_GENERATION=1` only when you want slower local Ollama drafting for page concepts.
 
 ## Admin, Users, One-Time Plans, Features, and Usage History
 
