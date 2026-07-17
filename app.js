@@ -125,6 +125,14 @@ function applyFeatureGates(){
   $("#saveProject").disabled=!hasFeature("export.save-project");
   $("#exportJson").disabled=false;
   $("#exportTxt").disabled=!hasFeature("export.txt");
+  const canUseAdvancedDirection=hasFeature("advanced.custom-direction");
+  $("#advancedInputs")?.classList.toggle("locked",!canUseAdvancedDirection);
+  $("#customDirection").disabled=!canUseAdvancedDirection;
+  $("#avoidTerms").disabled=!canUseAdvancedDirection;
+  if(!canUseAdvancedDirection){
+    $("#customDirection").value="";
+    $("#avoidTerms").value="";
+  }
   const canListing=hasFeature("kit.listing-assets");
   const canQuality=hasFeature("kit.quality-check")||hasFeature("kit.series-builder")||hasFeature("kit.launch-checklist");
   document.querySelector('[data-tab="listing"]')?.classList.toggle("hidden",!canListing);
@@ -141,7 +149,13 @@ document.addEventListener("click",e=>{if(!e.target.closest?.("#accountDock"))$("
 $("#copyAccountToken")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
 $$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#theme").value=b.dataset.theme;showView("creator");applyFeatureGates()}));
 async function health(){try{const d=await api("/api/health");engineReady=!!d.ollama;if(!engineReady)toast("Creator unavailable","The content engine is not ready yet.",8000)}catch{engineReady=false;toast("Connection unavailable","Please start the BrightBook service and try again.",8000)}finally{$("#generate").disabled=false}}
-function settings(){const theme=$("#theme").value,activityType=$("#activityType").value,genreType=$("#genreType").value;return{topic:theme,theme,customDirection:"",activityType,activityTypes:[activityType],age:$("#age").value,language:$("#language").value,pageCount:Number($("#pageCount").value),genreType,difficulty:genreType,size:"A4",style:styleFromGenre(genreType),learningGoal:"",guideCharacter:""}}
+function settings(){
+  const theme=$("#theme").value,activityType=$("#activityType").value,genreType=$("#genreType").value;
+  const bookIdea=$("#bookIdea")?.value.trim()||"";
+  const customDirection=$("#customDirection")?.disabled?"":($("#customDirection")?.value.trim()||"");
+  const avoidTerms=$("#avoidTerms")?.disabled?"":($("#avoidTerms")?.value.trim()||"");
+  return{topic:theme,theme,bookIdea,customDirection,avoidTerms,activityType,activityTypes:[activityType],age:$("#age").value,language:$("#language").value,pageCount:Number($("#pageCount").value),genreType,difficulty:genreType,size:"A4",style:styleFromGenre(genreType),learningGoal:"",guideCharacter:""};
+}
 function normalizeSelections(){
   applyFeatureGates();
   if(!$("#activityType").value&&$("#activityType option"))$("#activityType").value=$("#activityType option").value;
@@ -178,7 +192,7 @@ $("#saveProject").addEventListener("click",async()=>{if(!current)return;try{awai
 async function loadProjects(){try{const d=await api("/api/projects");$("#projectGrid").innerHTML=d.items.length?d.items.map(p=>`<article class="project-card"><span class="eyebrow">ACTIVITY BOOK</span><h3>${esc(p.title)}</h3><p>${esc(p.settings.topic||"")} ? ${p.book.pages.length} pages</p><footer><span>${new Date((p.createdAt+"Z").replace(" ","T")).toLocaleDateString("en-US")}</span><button data-open="${p.id}">Open -></button></footer></article>`).join(""):`<p>No saved projects yet.</p>`;$$("[data-open]").forEach(b=>b.addEventListener("click",()=>{const p=d.items.find(x=>x.id===Number(b.dataset.open));current=p.book;currentSettings=p.settings;render(current);showView("creator")}))}catch(e){toast("Unable to load projects",e.message)}}
 function download(name,text,type="text/plain"){const blob=new Blob([text],{type:`${type};charset=utf-8`}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
 $("#exportJson").addEventListener("click",()=>{if(!current)return toast("Nothing to export","Generate a product kit first.",5000);download("activity-book.json",JSON.stringify(current,null,2),"application/json")});$("#exportTxt").addEventListener("click",()=>{if(!current)return toast("Nothing to export","Generate a product kit first.",5000);const listing=current.listing_assets||{},quality=current.quality_check||{};let t=`${current.book_title}\n${current.subtitle}\n\n${current.description}\n\n`;t+=`KDP TITLE\n${listing.kdp_title||current.book_title}\n\nKDP SUBTITLE\n${listing.kdp_subtitle||current.subtitle}\n\nKDP DESCRIPTION\n${listing.kdp_description||current.description}\n\nBACKEND KEYWORDS\n${(listing.backend_keywords||[]).join("\n")}\n\nETSY TITLE\n${listing.etsy_title||current.book_title}\n\nETSY TAGS\n${(listing.etsy_tags||[]).join(", ")}\n\nA+ CONTENT IDEAS\n${(listing.a_plus_sections||[]).map(x=>`- ${x}`).join("\n")}\n\nQUALITY SCORE\n${quality.score??0}/100\n\nWARNINGS\n${(quality.warnings||[]).map(x=>`- ${x}`).join("\n")||"- No issues found."}\n\nSERIES IDEAS\n${(current.series_ideas||[]).map(x=>`- ${x}`).join("\n")}\n\nPUBLISHING CHECKLIST\n${(current.publishing_checklist||[]).map(x=>`- ${x}`).join("\n")}\n\n`;current.pages.forEach(p=>t+=`PAGE ${p.page_number}: ${p.title}\n${p.instruction}\nContent: ${p.content_items.join(", ")}\nImage prompt: ${p.image_prompt}\nAnswer: ${p.answer}\n\n`);download("activity-book-publishing-kit.txt",t)});
-function reset(){current=null;currentSettings=null;$("#activityType").value="coloring";$("#theme").value="Ocean Animals";$("#pageCount").value="25";$("#genreType").value="Classic Educational";$("#result").classList.add("hidden");$("#loading").classList.add("hidden");$("#emptyPreview").classList.remove("hidden");applyFeatureGates()}
+function reset(){current=null;currentSettings=null;$("#activityType").value="coloring";$("#theme").value="Ocean Animals";$("#pageCount").value="25";$("#genreType").value="Classic Educational";$("#bookIdea").value="";$("#customDirection").value="";$("#avoidTerms").value="";$("#result").classList.add("hidden");$("#loading").classList.add("hidden");$("#emptyPreview").classList.remove("hidden");applyFeatureGates()}
 function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
 health();loadAccount();
 

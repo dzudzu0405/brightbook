@@ -263,3 +263,20 @@ select:focus,input:focus{
   .intro h2{font-size:31px}
   .view{padding:24px 16px}
 }
+.grid.one{grid-template-columns:1fr}
+.advanced textarea{
+  width:100%;
+  min-height:92px;
+  padding:12px;
+  background:#fbfcfb;
+  border:1px solid var(--line);
+  border-radius:9px;
+  outline:0;
+  font-size:12px;
+  line-height:1.5;
+  resize:vertical;
+}
+.advanced textarea:focus{border-color:#88c8b2;box-shadow:0 0 0 3px rgba(56,157,123,.09)}
+details.locked{opacity:.72}
+details.locked summary small:after{content:" · locked by plan";color:#b45309}
+details.locked textarea{background:#f3f6f4;cursor:not-allowed}

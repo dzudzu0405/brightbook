@@ -289,6 +289,7 @@ function requiredFeatureKeys(input) {
   const keys = [`activity.${input.activityType}`, `quantity.${input.pageCount}`];
   if (input.theme) keys.push(themeFeatureKey(input.theme));
   if (String(input.customDirection || "").trim()) keys.push("advanced.custom-direction");
+  if (String(input.avoidTerms || "").trim()) keys.push("advanced.custom-direction");
   if (String(input.learningGoal || "").trim()) keys.push("advanced.learning-goal");
   if (String(input.guideCharacter || "").trim()) keys.push("advanced.guide-character");
   return keys;
@@ -532,17 +533,19 @@ function sceneTitle(theme,scene,pageNumber){
 }
 function visualContract(input){
   input.size = "A4";
+  const avoid=String(input.avoidTerms||"").trim();
   const characterLock=input.guideCharacter
     ? `Recurring character lock: ${input.guideCharacter}; keep the same species/person, age, face, body proportions, clothing, colors, accessories, and personality across every prompt`
     : "Character consistency lock: whenever a character recurs, repeat the same species/person, age, face, body proportions, clothing, colors, and accessories";
+  const userAvoid=avoid ? `, avoid these user-specified elements: ${avoid}` : "";
   return {
     styleAnchor:`${input.style}, consistent child-friendly visual language`,
     themeDirection:themeVisualDirection(input.theme||input.topic),
     characterLock,
     layoutLock:`one standalone A4 portrait printable page, clear focal hierarchy, clean margins, safe trim area, no cropped important objects`,
     negativeLock:input.activityType==="coloring"
-      ? "black-and-white line art only, no color, no grayscale, no shading, no gradients, no shadows, no textures, no title, no words, no letters, no numbers, no labels, no captions, no signage, no watermark, no logo, no border, no photorealism, no 3D render"
-      : "no watermark, no logo, no brand characters, no photorealism, no 3D render, no malformed anatomy, no clutter, no cropped important objects, no illegible embedded text"
+      ? `black-and-white line art only, no color, no grayscale, no shading, no gradients, no shadows, no textures, no title, no words, no letters, no numbers, no labels, no captions, no signage, no watermark, no logo, no border, no photorealism, no 3D render${userAvoid}`
+      : `no watermark, no logo, no brand characters, no photorealism, no 3D render, no malformed anatomy, no clutter, no cropped important objects, no illegible embedded text${userAvoid}`
   };
 }
 function lockImagePrompt(prompt,input){
@@ -646,6 +649,9 @@ Create exactly ${batchCount} unique printable activity concepts for prompts ${st
 USER SETTINGS
 - Main topic: ${input.topic}
 - Selected theme: ${input.theme || input.topic}
+- User book idea / niche: ${input.bookIdea || "not provided; infer a strong marketplace-friendly angle from the selected theme"}
+- Special direction: ${input.customDirection || "not provided"}
+- Exclude / avoid: ${input.avoidTerms || "not provided"}
 - Age group: ${input.age}
 - Content language: ${input.language}
 - Product/activity type: ${input.activityType}
@@ -688,12 +694,14 @@ RULES
 13. For coloring or creative pages, the answer should say that multiple valid color choices are accepted while noting any learning requirement.
 14. For educational-story pages, create one connected story across the book. Each page must contain a short scene, an age-appropriate lesson, a concrete illustration prompt, and a simple reflection answer or takeaway.
 15. For tracing pages, specify the exact letters, words, or strokes to trace. For puzzle pages, fully define the puzzle and its exact solution.
-16. Translate the requested illustration style into English inside image prompts. Do not put non-English style phrases in image prompts.
-17. Every image prompt must explicitly describe subjects, action, expression, clothing/costumes if relevant, props, background, composition, printable A4 portrait layout, and the selected type/genre direction.
-18. Do not use copyrighted characters, brands, logos, or trademarks.
-19. Do not claim that generated images are automatically KDP-ready.
-20. Every title and concept must be different from the titles already used in earlier batches.
-21. Return only JSON matching the supplied schema.`;
+16. Respect the user book idea as a niche direction, but keep every page anchored to the selected theme and activity type.
+17. Respect special direction and exclude/avoid constraints unless they conflict with child safety or printable quality.
+18. Translate the requested illustration style into English inside image prompts. Do not put non-English style phrases in image prompts.
+19. Every image prompt must explicitly describe subjects, action, expression, clothing/costumes if relevant, props, background, composition, printable A4 portrait layout, and the selected type/genre direction.
+20. Do not use copyrighted characters, brands, logos, or trademarks.
+21. Do not claim that generated images are automatically KDP-ready.
+22. Every title and concept must be different from the titles already used in earlier batches.
+23. Return only JSON matching the supplied schema.`;
 }
 async function generateBatch(input,startPage,batchCount,previousTitles,previousPages) {
   const controller = new AbortController();
@@ -726,12 +734,17 @@ function fallbackPage(input,pageNumber){
   const theme=input.theme||input.topic||"Activity";
   const activity=String(input.activityType||"activity").replace(/-/g," ");
   const scenePool=themeScenePool(theme);
-  const sceneSeed=scenePool[(pageNumber-1)%scenePool.length];
-  const title=sceneTitle(theme,sceneSeed,pageNumber);
-  const coloringPrompt=`Create a premium black-and-white coloring book illustration for children, vertical A4 portrait composition.\n\nScene: ${sceneSeed}. Make the page feel like a polished commercial coloring book interior, not a worksheet and not a poster. Use one clear focal scene with balanced composition, charming child-safe characters or objects, expressive faces where relevant, recognizable props, and plenty of fun details for coloring.\n\nLine art requirements: crisp clean black outlines, smooth confident strokes, closed shapes, large colorable areas, moderate detail, uncluttered spacing, white background, no filled black areas except tiny pupils if needed, no gray shading, no crosshatching, no gradients, no textures, no screen tones.\n\nCritical text rule: do not include any title, heading, caption, label, signage, alphabet letters, numbers, speech bubbles, random symbols, or readable/unreadable text anywhere in the image.\n\nNegative prompt: text, words, letters, numbers, typography, title, subtitle, captions, labels, signs, watermark, logo, border, frame, color, grayscale, shading, gradients, shadows, photorealism, 3D render, messy anatomy, extra fingers, cropped subjects, clutter.`;
+  const baseScene=scenePool[(pageNumber-1)%scenePool.length];
+  const idea=String(input.bookIdea||"").trim();
+  const direction=String(input.customDirection||"").trim();
+  const avoid=String(input.avoidTerms||"").trim();
+  const avoidLine=avoid?` Also avoid these user-specified elements: ${avoid}.`:"";
+  const sceneSeed=[baseScene,idea?`niche angle: ${idea}`:"",direction?`special direction: ${direction}`:""].filter(Boolean).join("; ");
+  const title=sceneTitle(theme,baseScene,pageNumber);
+  const coloringPrompt=`Create a premium black-and-white coloring book illustration for children, vertical A4 portrait composition.\n\nScene: ${sceneSeed}. Make the page feel like a polished commercial coloring book interior, not a worksheet and not a poster. Use one clear focal scene with balanced composition, charming child-safe characters or objects, expressive faces where relevant, recognizable props, and plenty of fun details for coloring.${avoidLine}\n\nLine art requirements: crisp clean black outlines, smooth confident strokes, closed shapes, large colorable areas, moderate detail, uncluttered spacing, white background, no filled black areas except tiny pupils if needed, no gray shading, no crosshatching, no gradients, no textures, no screen tones.\n\nCritical text rule: do not include any title, heading, caption, label, signage, alphabet letters, numbers, speech bubbles, random symbols, or readable/unreadable text anywhere in the image.\n\nNegative prompt: text, words, letters, numbers, typography, title, subtitle, captions, labels, signs, watermark, logo, border, frame, color, grayscale, shading, gradients, shadows, photorealism, 3D render, messy anatomy, extra fingers, cropped subjects, clutter${avoid?`, ${avoid}`:""}.`;
   const commonPrompt=input.activityType==="coloring"
     ? coloringPrompt
-    : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber} with clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, and cropped important objects.`;
+    : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber}; ${sceneSeed}. Include clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, cropped important objects${avoid?`, ${avoid}`:""}.`;
   const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Color the ${theme.toLowerCase()} scene with care and notice the farm details.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[sceneSeed,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
   if(input.activityType==="word-search"){
     const words=[theme.split(/\s+/)[0]||"OCEAN","FIND","LEARN","PLAY","SMART","FOCUS","WORD","BOOK"];
@@ -748,13 +761,14 @@ function fallbackPage(input,pageNumber){
 function generateFallbackBook(input,reason=""){
   const theme=input.theme||input.topic||"Activity";
   const activity=String(input.activityType||"activity").replace(/-/g," ");
+  const idea=String(input.bookIdea||"").trim();
   const pages=Array.from({length:input.pageCount},(_,index)=>fallbackPage(input,index+1));
   const book={
-    book_title:`${theme} ${activity.replace(/\b\w/g,c=>c.toUpperCase())} Kit`,
+    book_title:`${idea ? idea.replace(/\b\w/g,c=>c.toUpperCase()).slice(0,55) : `${theme} ${activity.replace(/\b\w/g,c=>c.toUpperCase())}`} Kit`,
     subtitle:`Printable ${activity} pages for ${input.age}`,
-    description:`A quick product kit for ${theme} ${activity} pages with instructions, answer guidance, cover direction, listing assets, and a launch checklist.`,
-    cover_prompt:lockCoverPrompt(`A polished ${theme} ${activity} activity book cover with friendly child-safe visuals, clear title-safe space, and marketplace-ready composition`,input),
-    keywords:[theme,`${theme} ${activity}`,`${activity} book`,"printable activity","kids workbook","KDP interior","Etsy printable","learning pages"],
+    description:`A quick product kit for ${idea||`${theme} ${activity} pages`} with instructions, answer guidance, cover direction, listing assets, and a launch checklist.`,
+    cover_prompt:lockCoverPrompt(`A polished ${idea||`${theme} ${activity} activity book`} cover with friendly child-safe visuals, clear title-safe space, and marketplace-ready composition`,input),
+    keywords:[theme,idea,`${theme} ${activity}`,`${activity} book`,"printable activity","kids workbook","KDP interior","Etsy printable","learning pages"].filter(Boolean),
     pages
   };
   ensurePublishingKit(book,input);
@@ -824,6 +838,11 @@ function validate(input){
   if(!isGenreCompatible(input.activityType,input.theme,input.genreType))throw new Error(`The selected type / genre is not a good fit for ${input.activityType} with ${input.theme}. Please choose another combination.`);
   input.difficulty=input.genreType;
   input.style=String(input.style||styleFromGenre(input.genreType)).trim();
+  input.bookIdea=String(input.bookIdea||"").replace(/\s+/g," ").trim().slice(0,180);
+  input.customDirection=String(input.customDirection||"").replace(/\s+/g," ").trim().slice(0,500);
+  input.avoidTerms=String(input.avoidTerms||"").replace(/\s+/g," ").trim().slice(0,350);
+  input.learningGoal=String(input.learningGoal||"").replace(/\s+/g," ").trim().slice(0,240);
+  input.guideCharacter=String(input.guideCharacter||"").replace(/\s+/g," ").trim().slice(0,240);
   input.size="A4";
   input.pageCount=Number(input.pageCount);
   if(![25,30].includes(input.pageCount))throw new Error("Please select 25 or 30 prompts.");

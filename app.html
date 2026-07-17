@@ -142,6 +142,25 @@
               </label>
             </div>
 
+            <div class="grid one">
+              <label><span>Book Idea</span>
+                <input id="bookIdea" maxlength="180" placeholder="Example: cute farm animal coloring book for preschool kids">
+                <small class="field-help">Optional, but helps BrightBook shape the kit around your niche.</small>
+              </label>
+            </div>
+
+            <details id="advancedInputs">
+              <summary>Advanced direction <small>Optional OTO-style controls</small></summary>
+              <div class="advanced">
+                <label><span>Special Direction</span>
+                  <textarea id="customDirection" maxlength="500" placeholder="Example: make every page cute, simple, cozy, and easy for ages 4-6"></textarea>
+                </label>
+                <label><span>Exclude / Avoid</span>
+                  <textarea id="avoidTerms" maxlength="350" placeholder="Example: no scary animals, no weapons, no text, no complex background"></textarea>
+                </label>
+              </div>
+            </details>
+
             <div class="generate-row">
               <div><strong>25-30 pages in every kit</strong><small>Prompts, answer keys, listing assets, and quality checks</small></div>
               <button id="generate" type="button"><span>✦</span><strong>Generate Product Kit</strong></button>
