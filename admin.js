@@ -35,10 +35,11 @@ function renderFeatureMatrix(){
 }
 async function loadUsers(){
   const d=await api("/api/admin/users");
+  const planOptions=user=>plans.map(p=>`<option value="${p.id}" ${p.id===user.planId?"selected":""}>${esc(p.name)}</option>`).join("");
   $("#users").innerHTML=d.items.map(u=>`
     <tr>
       <td><strong>${esc(u.email)}</strong><small>${esc(u.name||"")}</small></td>
-      <td>${esc(u.planName)}</td>
+      <td><select data-plan="${u.id}">${planOptions(u)}</select></td>
       <td><span class="feature-count">${(u.features||[]).length} enabled</span><small>${esc((u.features||[]).slice(0,4).join(", "))}${(u.features||[]).length>4?"...":""}</small></td>
       <td>${u.used} generated<small>history only, not credit</small></td>
       <td><select data-status="${u.id}"><option ${u.status==="active"?"selected":""}>active</option><option ${u.status==="paused"?"selected":""}>paused</option></select></td>
@@ -46,7 +47,7 @@ async function loadUsers(){
       <td><button data-copy="${esc(u.token)}">Copy</button><button data-save="${u.id}">Save</button></td>
     </tr>`).join("");
   $$("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{await navigator.clipboard.writeText(b.dataset.copy);toast("Token copied")}));
-  $$("[data-save]").forEach(b=>b.addEventListener("click",async()=>{const id=b.dataset.save;const status=document.querySelector(`[data-status="${id}"]`).value;await api(`/api/admin/users/${id}`,{method:"PATCH",body:JSON.stringify({status})});toast("User updated");await loadUsers()}));
+  $$("[data-save]").forEach(b=>b.addEventListener("click",async()=>{const id=b.dataset.save;const status=document.querySelector(`[data-status="${id}"]`).value;const planId=Number(document.querySelector(`[data-plan="${id}"]`).value);await api(`/api/admin/users/${id}`,{method:"PATCH",body:JSON.stringify({status,planId})});toast("User updated");await loadUsers()}));
 }
 async function loadUsage(){
   const d=await api("/api/admin/usage");

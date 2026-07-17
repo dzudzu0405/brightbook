@@ -68,8 +68,9 @@ function setThemeOptions(items,current){
 }
 function applyFeatureGates(){
   const previous={activity:$("#activityType").value,theme:$("#theme").value,genre:$("#genreType").value,pageCount:$("#pageCount").value};
+  const hasLoadedFeatures=accountFeatures.size>0;
   const planActivitiesByFeature=initialActivities.filter(a=>hasFeature(`activity.${a.value}`));
-  const planActivities=planActivitiesByFeature.length?planActivitiesByFeature:initialActivities;
+  const planActivities=hasLoadedFeatures?planActivitiesByFeature:initialActivities;
   setPlainOptions($("#activityType"),planActivities,previous.activity);
 
   let activity=$("#activityType").value;
@@ -86,9 +87,9 @@ function applyFeatureGates(){
     const allowedByPlan=hasFeature(t.featureKey);
     const activityCompatible=t.compatibleActivityTypes.includes(activity);
     const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return (allowedByPlan||!accountFeatures.size)&&activityCompatible&&genreCompatible;
+    return (allowedByPlan||!hasLoadedFeatures)&&activityCompatible&&genreCompatible;
   });
-  if(!themes.length)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
+  if(!themes.length&&!hasLoadedFeatures)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
   setThemeOptions(themes,previous.theme);
 
   let theme=$("#theme").value;
@@ -113,13 +114,13 @@ function applyFeatureGates(){
     const allowedByPlan=hasFeature(t.featureKey);
     const activityCompatible=t.compatibleActivityTypes.includes(activity);
     const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return (allowedByPlan||!accountFeatures.size)&&activityCompatible&&genreCompatible;
+    return (allowedByPlan||!hasLoadedFeatures)&&activityCompatible&&genreCompatible;
   });
-  if(!themes.length)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
+  if(!themes.length&&!hasLoadedFeatures)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
   setThemeOptions(themes,$("#theme").value);
 
   const pageCountsByFeature=initialPageCounts.filter(value=>hasFeature(`quantity.${value}`)).map(value=>({value,label:value}));
-  const pageCounts=pageCountsByFeature.length?pageCountsByFeature:initialPageCounts.map(value=>({value,label:value}));
+  const pageCounts=hasLoadedFeatures?pageCountsByFeature:initialPageCounts.map(value=>({value,label:value}));
   setPlainOptions($("#pageCount"),pageCounts,previous.pageCount);
   $("#saveProject").disabled=!hasFeature("export.save-project");
   $("#exportJson").disabled=false;
