@@ -34,7 +34,7 @@ node server.js
 
 The application does not call the OpenAI API. Project data is stored in `data/brightbook.db`.
 
-By default, BrightBook uses Fast Product Kit mode so product kits generate immediately. Set `USE_OLLAMA_GENERATION=1` only when you want slower local Ollama drafting for page concepts.
+By default, BrightBook uses local Ollama generation for stronger page concepts and image prompts. Set `USE_OLLAMA_GENERATION=0` only when you want instant Fast Product Kit mode for demos.
 
 ## Admin, Users, One-Time Plans, Features, and Usage History
 

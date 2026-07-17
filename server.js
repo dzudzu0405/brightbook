@@ -9,7 +9,7 @@ const PORT = Number(process.env.PORT || 4180);
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OLLAMA_MODEL || "gemma3:4b";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "brightbook-admin";
-const USE_OLLAMA_GENERATION = process.env.USE_OLLAMA_GENERATION === "1";
+const USE_OLLAMA_GENERATION = process.env.USE_OLLAMA_GENERATION !== "0";
 fs.mkdirSync(path.join(ROOT, "data"), { recursive: true });
 const db = new DatabaseSync(path.join(ROOT, "data", "brightbook.db"));
 db.exec(`
@@ -638,6 +638,11 @@ function ensurePublishingKit(book,input){
   }
   return book;
 }
+function removePageCountWarnings(book){
+  if(!book?.quality_check?.warnings)return book;
+  book.quality_check.warnings=book.quality_check.warnings.filter(warning=>!/page count does not match/i.test(String(warning)));
+  return book;
+}
 function buildPrompt(input, startPage, batchCount, previousTitles=[], previousPages=[]) {
   const pagePlan = Array.from({ length: batchCount }, (_, index) => {
     const activityType = input.activityType;
@@ -815,7 +820,8 @@ async function generateBook(input) {
     evalCount+=Number(result.metrics.evalCount||0);
   }
   if(pages.length!==input.pageCount)throw new Error(`The content engine created ${pages.length}/${input.pageCount} prompts. Please generate again.`);
-  return {book:{...metadata,pages},metrics:{totalDuration,evalCount,batches:Math.ceil(input.pageCount/batchSize)}};
+  const book=removePageCountWarnings(ensurePublishingKit({...metadata,pages},input));
+  return {book,metrics:{totalDuration,evalCount,batches:Math.ceil(input.pageCount/batchSize)}};
   } catch(e) {
     console.warn("Using fallback product kit generator:", e.message);
     return generateFallbackBook(input,e.name==="AbortError"?"The content engine took too long to respond.":e.message);
