@@ -419,10 +419,11 @@ const PRODUCT_RULES={
 - Use bold black outlines, large closed shapes, generous white space, and low detail appropriate to the age group.
 - The image prompt must explicitly request black-and-white line art only and prohibit color, gray fill, shading, text, borders, and cropped subjects.`,
   "word-search":`WORD SEARCH CONTRACT
-- Each page needs a unique subtopic and 8-14 age-appropriate words.
-- content_items must include the exact word list and a complete letter grid with consistent row lengths.
-- The answer must list every hidden word with its start position and direction.
-- The image prompt should describe only small themed border decorations and leave a large clean central area for the puzzle grid. Do not ask the image model to render letters.`,
+- Each page is a real printable word-search puzzle, not an illustration prompt pretending to be a puzzle.
+- Each page needs one unique theme subtopic and exactly 10 age-appropriate uppercase words, 3-10 letters each, no spaces, no punctuation.
+- content_items must include "WORD LIST: ..." and exactly 12 "GRID ROW NN: ..." entries. Every grid row must be 12 uppercase letters with spaces between letters.
+- The answer must list every hidden word with row, column, and direction using H, V, or D. Example: COW: row 2, col 4, direction H.
+- The image_prompt must NOT ask an image model to draw the word grid, letters, words, typography, or answer key. It should only describe a printable worksheet frame: small themed border decorations, title-safe area, and one large blank central rectangle where the generated grid will be placed later by layout software.`,
   "educational-story":`EDUCATIONAL STORY CONTRACT
 - Build one connected story arc across all prompts: introduction, small challenge, attempts, resolution, and takeaway.
 - Keep the same recurring character design, clothing, colors, and personality on every page.
@@ -602,6 +603,63 @@ function sceneTitle(theme,scene,pageNumber){
   const titleWords=String(scene||"").split(/\s+/).filter(word=>!/^(a|an|the|with|and|in|on|near|beside|inside|around|of|to|for|its|clear|foreground|shapes|child-friendly|background|details)$/i.test(word)).slice(0,7).join(" ");
   return `${t}: ${titleWords.replace(/[^\w\s-]/g,"").replace(/\b\w/g,c=>c.toUpperCase())}`;
 }
+function cleanWord(value=""){
+  return String(value).toUpperCase().replace(/[^A-Z]/g,"").slice(0,10);
+}
+function wordBank(theme=""){
+  const t=String(theme).toLowerCase();
+  if(/farm/.test(t))return ["COW","SHEEP","PIG","HORSE","GOAT","DUCK","CHICKEN","ROOSTER","BARN","TRACTOR","HAY","CALF","LAMB","PONY","FENCE","EGGS","FARMER","STABLE","PASTURE","GARDEN"];
+  if(/ocean|coral|sea/.test(t))return ["DOLPHIN","TURTLE","WHALE","SHARK","OCTOPUS","CRAB","CORAL","REEF","SHELL","SEAL","FISH","WAVE","KELP","SQUID","LOBSTER","SEAHORSE"];
+  if(/safari/.test(t))return ["LION","ZEBRA","GIRAFFE","ELEPHANT","RHINO","HIPPO","CHEETAH","GAZELLE","MONKEY","SAVANNA","ACACIA","LEOPARD"];
+  if(/space|astronaut|solar/.test(t))return ["ROCKET","PLANET","MOON","STAR","COMET","ORBIT","ASTRO","MARS","VENUS","SATURN","GALAXY","METEOR"];
+  if(/dinosaur/.test(t))return ["DINOSAUR","TREX","RAPTOR","FOSSIL","EGG","JURASSIC","STEGOSAUR","TRICERA","VOLCANO","BONES","TAIL","CLAW"];
+  const pieces=themeElements(theme);
+  return [...pieces.subjects,...pieces.settings,...pieces.props,theme].map(cleanWord).filter(word=>word.length>=3);
+}
+function buildWordSearchPuzzle(theme,pageNumber){
+  const size=12;
+  const pool=[...new Set(wordBank(theme))].filter(word=>word.length>=3&&word.length<=10);
+  const orderedPool=Array.from({length:pool.length},(_,i)=>pool[(pageNumber+i-1)%pool.length]).sort((a,b)=>b.length-a.length);
+  const grid=Array.from({length:size},()=>Array(size).fill(""));
+  const placements=[];
+  const directions=[
+    {code:"H",dr:0,dc:1},
+    {code:"V",dr:1,dc:0},
+    {code:"D",dr:1,dc:1}
+  ];
+  const canPlace=(word,row,col,dir)=>[...word].every((letter,index)=>{
+    const r=row+dir.dr*index,c=col+dir.dc*index;
+    return r<size&&c<size&&(!grid[r][c]||grid[r][c]===letter);
+  });
+  const placeWord=(word,index)=>{
+    for(let attempt=0;attempt<144;attempt++){
+      const dir=directions[(index+attempt)%directions.length];
+      const row=(index*3+attempt*2)%size;
+      const col=(index*5+attempt)%size;
+      if(!canPlace(word,row,col,dir))continue;
+      [...word].forEach((letter,i)=>{grid[row+dir.dr*i][col+dir.dc*i]=letter});
+      placements.push({word,answer:`${word}: row ${row+1}, col ${col+1}, direction ${dir.code}`});
+      return true;
+    }
+    return false;
+  };
+  for(const word of orderedPool){
+    if(placements.length>=10)break;
+    placeWord(word,placements.length);
+  }
+  let fillerIndex=1;
+  while(placements.length<10){
+    const word=`WORD${fillerIndex++}`;
+    placeWord(word,placements.length);
+  }
+  const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])grid[r][c]=alphabet[(r*7+c*11+pageNumber)%alphabet.length];
+  return {
+    words:placements.map(item=>item.word),
+    rows:grid.map(row=>row.join(" ")),
+    answers:placements.map(item=>item.answer)
+  };
+}
 function visualContract(input){
   input.size = "A4";
   const avoid=String(input.avoidTerms||"").trim();
@@ -622,6 +680,17 @@ function visualContract(input){
 function lockImagePrompt(prompt,input){
   const c=visualContract(input);
   let scene=String(prompt||"").trim().replace(/[.\s]+$/,"");
+  if(input.activityType==="word-search"){
+    return `Create a clean printable word-search worksheet frame for children, vertical A4 portrait composition.
+
+Scene decoration: ${scene}. Use only small ${input.theme || input.topic} themed border illustrations in the corners and margins, with a large blank central rectangle reserved for a word-search grid that will be added later by layout software.
+
+Layout requirements: clear title-safe area at the top, word-list area below or beside the blank grid space, generous margins, simple child-friendly decorative icons, balanced worksheet composition, no busy background behind the puzzle area.
+
+Critical text rule: do not render any letters, words, puzzle grid, answer key, labels, captions, signage, typography, watermark, logo, or random symbols anywhere in the image.
+
+Negative prompt: letters, words, text, typography, alphabet, numbers, grid letters, word search grid, answer key, labels, captions, signs, watermark, logo, clutter, cropped layout, photorealism, 3D render.`;
+  }
   if(input.activityType==="coloring"){
     scene=scene
       .replace(/\bvibrant\b/gi,"lively")
@@ -823,8 +892,17 @@ function fallbackPage(input,pageNumber){
     : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber}; ${sceneSeed}. Include clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, cropped important objects${avoid?`, ${avoid}`:""}.`;
   const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Color the ${theme.toLowerCase()} scene with care and notice the farm details.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[sceneSeed,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
   if(input.activityType==="word-search"){
-    const words=[theme.split(/\s+/)[0]||"OCEAN","FIND","LEARN","PLAY","SMART","FOCUS","WORD","BOOK"];
-    return {...base,instruction:`Find the hidden ${theme} words in the grid.`,content_items:[`Words: ${words.join(", ")}`,"Grid: F I N D P L A Y / L E A R N B O O / S M A R T W O R / F O C U S D K S"],answer:`Hidden words: ${words.join(", ")}.`};
+    const puzzle=buildWordSearchPuzzle(theme,pageNumber);
+    const imagePrompt=`Create a clean printable word-search worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed border decorations in the corners and margins, with a large blank central rectangle reserved for a 12 by 12 word-search grid that will be added later by layout software. Include a small blank word-list area below the grid, generous white space, simple child-friendly icons, and a polished workbook feel. Do not render any letters, words, puzzle grid, answer key, labels, captions, signage, typography, watermark, logo, or random symbols anywhere in the image.`;
+    return {
+      ...base,
+      title:`${theme}: ${puzzle.words[0]} Word Search`,
+      instruction:`Find the 10 hidden ${theme.toLowerCase()} words in the 12 by 12 grid. Words may go across, down, or diagonal.`,
+      learning_goal:"Theme vocabulary, visual scanning, spelling, and focus.",
+      content_items:[`WORD LIST: ${puzzle.words.join(", ")}`,...puzzle.rows.map((row,index)=>`GRID ROW ${String(index+1).padStart(2,"0")}: ${row}`)],
+      image_prompt:imagePrompt,
+      answer:`ANSWER KEY: ${puzzle.answers.join("; ")}.`
+    };
   }
   if(input.activityType==="tracing"){
     return {...base,instruction:`Trace the ${theme} vocabulary words, then write them once on your own.`,content_items:[`Trace: ${theme}`,`Trace: learn`,`Trace: explore`],answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly."};
