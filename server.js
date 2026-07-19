@@ -286,22 +286,28 @@ function seedBilling() {
   const featureRows = db.prepare("SELECT id,feature_key FROM features").all();
   const byKey = Object.fromEntries(featureRows.map(f => [f.feature_key, f.id]));
   const enable = db.prepare("INSERT OR IGNORE INTO plan_features(plan_id,feature_id,enabled) VALUES(?,?,1)");
-  const starter = ["activity.coloring","activity.word-search","activity.tracing","quantity.25","export.txt","export.json","kit.listing-assets"];
-  const creator = starter.concat(["activity.maze","activity.matching","activity.counting","activity.simple-math","activity.learning-worksheet","advanced.custom-direction","advanced.learning-goal","export.save-project","kit.quality-check","kit.series-builder"]);
-  const pro = creator.concat(["activity.educational-story","activity.spot-difference","activity.puzzle","quantity.30","advanced.guide-character","kit.launch-checklist"]);
+  const setPlanFeatures = db.prepare("DELETE FROM plan_features WHERE plan_id=?");
+  const starter = ["activity.coloring","activity.word-search","quantity.25","export.txt","export.json"];
+  const activityExpansion = starter.concat(["activity.maze","activity.tracing","activity.learning-worksheet","quantity.30","advanced.custom-direction"]);
+  const publishingKit = activityExpansion.concat(["export.save-project","kit.listing-assets","kit.quality-check","kit.series-builder","kit.launch-checklist"]);
+  const agency = publishingKit.concat(["activity.educational-story","activity.matching","activity.counting","activity.simple-math","activity.spot-difference","activity.puzzle","advanced.learning-goal","advanced.guide-character"]);
   for (const plan of allPlans) {
     const starterThemes = THEME_GROUPS.slice(0,2).flatMap(([,items])=>items).map(themeFeatureKey);
     const creatorThemes = THEME_GROUPS.slice(0,4).flatMap(([,items])=>items).map(themeFeatureKey);
     const proThemes = THEME_GROUPS.flatMap(([,items])=>items).map(themeFeatureKey);
     const planName = String(plan.name).toLowerCase();
     const isFrontEnd = planName === "starter" || planName === "front-end";
-    const isMiddle = planName === "creator" || planName === "pro oto";
-    const keys = (isFrontEnd ? starter.concat(starterThemes) : isMiddle ? creator.concat(creatorThemes) : pro.concat(proThemes));
+    const isActivityExpansion = planName === "creator" || planName === "pro oto" || planName === "activity expansion oto";
+    const isPublishingKit = planName === "publishing kit oto";
+    const keys = isFrontEnd
+      ? starter.concat(starterThemes)
+      : isActivityExpansion
+        ? activityExpansion.concat(creatorThemes)
+        : isPublishingKit
+          ? publishingKit.concat(proThemes)
+          : agency.concat(proThemes);
+    setPlanFeatures.run(plan.id);
     for (const key of keys) if (byKey[key]) enable.run(plan.id, byKey[key]);
-  }
-  for (const plan of allPlans) {
-    const planName = String(plan.name).toLowerCase();
-    if ((planName === "starter" || planName === "front-end") && byKey["export.json"]) enable.run(plan.id, byKey["export.json"]);
   }
 }
 seedBilling();
