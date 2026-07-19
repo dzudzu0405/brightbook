@@ -429,6 +429,7 @@ const PRODUCT_RULES={
 - Each page needs one unique theme subtopic and exactly 10 age-appropriate uppercase words, 3-10 letters each, no spaces, no punctuation.
 - content_items must include "WORD LIST: ..." and exactly 12 "GRID ROW NN: ..." entries. Every grid row must be 12 uppercase letters with spaces between letters.
 - The answer must list every hidden word with row, column, and direction using H, V, or D. Example: COW: row 2, col 4, direction H.
+- Every puzzle must include a mix of directions: at least 3 horizontal, at least 3 vertical, and at least 2 diagonal words.
 - The image_prompt must NOT ask an image model to draw the word grid, letters, words, typography, or answer key. It should only describe a printable worksheet frame: small themed border decorations, title-safe area, and one large blank central rectangle where the generated grid will be placed later by layout software.`,
   "educational-story":`EDUCATIONAL STORY CONTRACT
 - Build one connected story arc across all prompts: introduction, small challenge, attempts, resolution, and takeaway.
@@ -438,7 +439,8 @@ const PRODUCT_RULES={
   "maze":`MAZE BOOK CONTRACT
 - Every maze must have one visible start, one visible goal, a theme-relevant obstacle set, and exactly one intended solution.
 - Vary maze silhouettes and scene concepts while keeping paths wide and printable.
-- content_items and answer must define an exact route using U/D/L/R steps. The image prompt must request no decorative objects inside paths.`,
+- content_items must include a 9 by 9 maze blueprint using S, G, dot path cells, and hash wall cells, plus an exact solution route.
+- The image prompt must ask for a clean maze based on the supplied blueprint, with one continuous open route from START to GOAL and no decorative objects inside paths.`,
   "tracing":`TRACING & HANDWRITING CONTRACT
 - State the exact strokes, letters, numbers, or words to trace.
 - Progress gradually from guided examples to independent practice.
@@ -633,15 +635,31 @@ function buildWordSearchPuzzle(theme,pageNumber){
     {code:"V",dr:1,dc:0},
     {code:"D",dr:1,dc:1}
   ];
+  const slotPlan=[
+    {code:"D",row:0,col:0},{code:"D",row:0,col:4},{code:"D",row:2,col:0},
+    {code:"V",row:0,col:11},{code:"V",row:3,col:10},{code:"V",row:5,col:8},
+    {code:"H",row:10,col:0},{code:"H",row:11,col:1},{code:"H",row:8,col:0},{code:"H",row:6,col:0}
+  ];
   const canPlace=(word,row,col,dir)=>[...word].every((letter,index)=>{
     const r=row+dir.dr*index,c=col+dir.dc*index;
     return r<size&&c<size&&(!grid[r][c]||grid[r][c]===letter);
   });
-  const placeWord=(word,index)=>{
-    for(let attempt=0;attempt<144;attempt++){
-      const dir=directions[(index+attempt)%directions.length];
-      const row=(index*3+attempt*2)%size;
-      const col=(index*5+attempt)%size;
+  const placeWord=(word,index,slot=slotPlan[index%slotPlan.length])=>{
+    const preferred=directions.find(dir=>dir.code===slot.code)||directions[0];
+    const attempts=[{dir:preferred,row:slot.row,col:slot.col},...Array.from({length:144},(_,attempt)=>({dir:preferred,attempt}))];
+    for(const option of attempts){
+      const dir=option.dir;
+      if(option.row!=null&&option.col!=null){
+        if(!canPlace(word,option.row,option.col,dir))continue;
+        [...word].forEach((letter,i)=>{grid[option.row+dir.dr*i][option.col+dir.dc*i]=letter});
+        placements.push({word,answer:`${word}: row ${option.row+1}, col ${option.col+1}, direction ${dir.code}`});
+        return true;
+      }
+      const attempt=option.attempt;
+      const maxRow=size-(dir.dr?(word.length):1);
+      const maxCol=size-(dir.dc?(word.length):1);
+      const row=(index*3+attempt*2+pageNumber)%Math.max(1,maxRow+1);
+      const col=(index*5+attempt+pageNumber)%Math.max(1,maxCol+1);
       if(!canPlace(word,row,col,dir))continue;
       [...word].forEach((letter,i)=>{grid[row+dir.dr*i][col+dir.dc*i]=letter});
       placements.push({word,answer:`${word}: row ${row+1}, col ${col+1}, direction ${dir.code}`});
@@ -649,14 +667,17 @@ function buildWordSearchPuzzle(theme,pageNumber){
     }
     return false;
   };
-  for(const word of orderedPool){
-    if(placements.length>=10)break;
-    placeWord(word,placements.length);
+  for(let slot=0;slot<10;slot++){
+    const candidates=slotPlan[slot].code==="D"?[...orderedPool].sort((a,b)=>a.length-b.length):orderedPool;
+    for(const word of candidates){
+      if(placements.some(item=>item.word===word))continue;
+      if(placeWord(word,slot,slotPlan[slot]))break;
+    }
   }
   let fillerIndex=1;
   while(placements.length<10){
     const word=`WORD${fillerIndex++}`;
-    placeWord(word,placements.length);
+    placeWord(word,placements.length,slotPlan[placements.length]);
   }
   const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])grid[r][c]=alphabet[(r*7+c*11+pageNumber)%alphabet.length];
@@ -664,6 +685,34 @@ function buildWordSearchPuzzle(theme,pageNumber){
     words:placements.map(item=>item.word),
     rows:grid.map(row=>row.join(" ")),
     answers:placements.map(item=>item.answer)
+  };
+}
+function buildMazePuzzle(theme,pageNumber){
+  const mazeFromPath=(path)=>{
+    const grid=Array.from({length:9},()=>Array(9).fill("#"));
+    path.forEach(([row,col],index)=>{
+      grid[row][col]=index===0 ? "S" : index===path.length-1 ? "G" : ".";
+    });
+    const route=path.slice(1).map(([row,col],index)=>{
+      const [prevRow,prevCol]=path[index];
+      if(row===prevRow&&col===prevCol+1)return "R";
+      if(row===prevRow&&col===prevCol-1)return "L";
+      if(row===prevRow+1&&col===prevCol)return "D";
+      if(row===prevRow-1&&col===prevCol)return "U";
+      return "?";
+    }).join(", ");
+    return {rows:grid.map(row=>row.join("")),route};
+  };
+  const variants=[
+    mazeFromPath([[0,0],[0,1],[0,2],[1,2],[2,2],[2,3],[2,4],[3,4],[4,4],[4,3],[4,2],[4,1],[5,1],[6,1],[6,2],[6,3],[6,4],[6,5],[6,6],[7,6],[8,6],[8,7],[8,8]]),
+    mazeFromPath([[0,0],[1,0],[2,0],[2,1],[2,2],[1,2],[0,2],[0,3],[0,4],[1,4],[2,4],[3,4],[4,4],[4,5],[4,6],[5,6],[6,6],[6,5],[6,4],[7,4],[8,4],[8,5],[8,6],[8,7],[8,8]]),
+    mazeFromPath([[0,0],[0,1],[1,1],[2,1],[3,1],[3,2],[3,3],[2,3],[1,3],[1,4],[1,5],[2,5],[3,5],[4,5],[5,5],[5,4],[5,3],[6,3],[7,3],[7,4],[7,5],[7,6],[7,7],[8,7],[8,8]])
+  ];
+  const maze=variants[(pageNumber-1)%variants.length];
+  return {
+    rows:maze.rows,
+    route:maze.route,
+    legend:"S = start, G = goal, . = open path, # = wall"
   };
 }
 function visualContract(input){
@@ -952,7 +1001,8 @@ function fallbackPage(input,pageNumber){
     return {...base,title:`${theme}: Trace Set ${pageNumber}`,instruction:`Trace the ${theme.toLowerCase()} vocabulary words, then write each word once on your own.`,learning_goal:"Letter formation, handwriting confidence, and theme vocabulary.",content_items:[`TRACE WORD 1: ${words[0]}`,`TRACE WORD 2: ${words[1]}`,`TRACE WORD 3: ${words[2]}`,`WRITING SPACE: one blank line after each word`],image_prompt:`Create a clean printable handwriting worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed decorations around the margins and leave three wide blank tracing rows plus independent writing lines for layout software. Do not render letters, dotted words, labels, captions, watermark, logo, or random text.`,answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly on the blank line."};
   }
   if(input.activityType==="maze"){
-    return {...base,title:`${theme}: Maze Path ${pageNumber}`,instruction:`Help the character move through the ${theme.toLowerCase()} maze from start to finish.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:["START: top left","GOAL: bottom right","OBSTACLES: themed objects stay outside the path","ROUTE: R, R, D, D, R, D"],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition. Build a simple solvable maze with wide clean paths, start area at top left, goal area at bottom right, and ${theme} themed decorations outside the paths only. Do not place decorative objects inside paths. Do not render letters, labels, captions, watermark, logo, or random text.`,answer:"Solution route: R, R, D, D, R, D."};
+    const maze=buildMazePuzzle(theme,pageNumber);
+    return {...base,title:`${theme}: Maze Path ${pageNumber}`,instruction:`Help the character move through the ${theme.toLowerCase()} maze from START to GOAL.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:["MAZE SIZE: 9 by 9 cells",maze.legend,...maze.rows.map((row,index)=>`MAZE ROW ${String(index+1).padStart(2,"0")}: ${row}`),"START: S cell in the top-left area","GOAL: G cell in the bottom-right area",`SOLUTION ROUTE: ${maze.route}`],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition. Build a clean 9 by 9 maze based on this exact blueprint: ${maze.rows.join(" / ")}. Use wide white corridors for dot cells and thick simple black walls for hash cells. Put a small start icon in the S cell and a small goal icon in the G cell, but do not render the letters S or G. The maze must have a continuous open route from start to goal following this solution: ${maze.route}. Add small ${theme} themed decorations outside the maze border only. Do not place decorative objects inside paths. Do not create blocked exits, disconnected corridors, extra starts, extra goals, labels, captions, watermark, logo, or random text.`,answer:`Solution route: ${maze.route}.`};
   }
   return base;
 }
