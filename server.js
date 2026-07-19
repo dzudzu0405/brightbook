@@ -205,7 +205,7 @@ function compatibleActivityTypes(theme){
   if(/volcano/.test(t)) allowed.delete("tracing");
   if(/pirates|treasure hunt|camping adventure/.test(t)) allowed.delete("tracing");
   if(/christmas|halloween/.test(t)) allowed.delete("simple-math");
-  return [...allowed];
+  return [...allowed].filter(type=>!HIDDEN_ACTIVITY_TYPES.has(type));
 }
 function isCompatible(activityType,theme){
   if(!theme)return true;
@@ -1396,7 +1396,7 @@ async function api(req,res,pathname){
       activities:PUBLIC_ACTIVITY_TYPES.map(type=>({type,featureKey:`activity.${type}`})),
       themes:THEME_GROUPS.flatMap(([category,items])=>items.map(name=>({name,category,featureKey:themeFeatureKey(name),compatibleActivityTypes:compatibleActivityTypes(name)}))),
       genres:GENRE_TYPES.map(name=>({name,compatibleActivityTypes:compatibleActivitiesForGenre(name),compatibleThemes:compatibleThemesForGenre(name)})),
-      mazeLayouts:MAZE_LAYOUT_TYPES,
+      mazeLayouts:HIDDEN_ACTIVITY_TYPES.has("maze")?[]:MAZE_LAYOUT_TYPES,
       wordSearchModes:WORD_SEARCH_MODE_TYPES
     });
   }
