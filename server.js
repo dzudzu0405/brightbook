@@ -483,7 +483,8 @@ const PRODUCT_RULES={
 - Every maze must have one visible start, one visible goal, a theme-relevant obstacle set, and exactly one intended solution.
 - Vary maze silhouettes and scene concepts while keeping paths wide and printable. Use the selected maze layout/style when provided; if it is Mixed Marketplace Variety, rotate through rectangle, circular/ring, triangle/pyramid, object-shaped, house/barn, animal silhouette, and adventure path layouts across the book.
 - content_items must include a 9 by 9 maze blueprint using S, G, dot path cells, and hash wall cells, plus an exact solution route.
-- The image prompt must ask for a clean maze based on the supplied blueprint, with one continuous open route from START to GOAL and no decorative objects inside paths.`,
+- The image prompt must prioritize a playable maze over decorative shape accuracy: open entrance, open exit, unbroken white corridor, and no icons or decorations inside any corridor.
+- Start and goal characters/objects must sit outside the maze border beside the entrance/exit, never inside the maze path.`,
   "tracing":`TRACING & HANDWRITING CONTRACT
 - State the exact strokes, letters, numbers, or words to trace.
 - Progress gradually from guided examples to independent practice.
@@ -805,7 +806,7 @@ function buildMazePuzzle(theme,pageNumber,input={}){
       if(row===prevRow-1&&col===prevCol)return "U";
       return "?";
     }).join(", ");
-    return {rows:grid.map(row=>row.join("")),route};
+    return {rows:grid.map(row=>row.join("")),route,cells:path.map(([row,col])=>`R${row+1}C${col+1}`).join(" -> ")};
   };
   const variants=[
     mazeFromPath([[0,0],[0,1],[0,2],[1,2],[2,2],[2,3],[2,4],[3,4],[4,4],[4,3],[4,2],[4,1],[5,1],[6,1],[6,2],[6,3],[6,4],[6,5],[6,6],[7,6],[8,6],[8,7],[8,8]]),
@@ -818,6 +819,7 @@ function buildMazePuzzle(theme,pageNumber,input={}){
   return {
     rows:maze.rows,
     route:maze.route,
+    cells:maze.cells,
     layout:layout.layout,
     shape:layout.shape,
     start:story.start,
@@ -1130,7 +1132,7 @@ function fallbackPage(input,pageNumber){
   }
   if(input.activityType==="maze"){
     const maze=buildMazePuzzle(theme,pageNumber,input);
-    return {...base,title:`${theme}: ${maze.layout} ${pageNumber}`,instruction:`${maze.mission} by moving from START to GOAL.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:[`MAZE LAYOUT: ${maze.layout}`,`MAZE SHAPE: ${maze.shape}`,"MAZE SIZE: 9 by 9 cells",maze.legend,...maze.rows.map((row,index)=>`MAZE ROW ${String(index+1).padStart(2,"0")}: ${row}`),`START CHARACTER: ${maze.start}`,`GOAL OBJECT: ${maze.goal}`,"START: S cell in the top-left area","GOAL: G cell in the bottom-right area",`SOLUTION ROUTE: ${maze.route}`],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition, inspired by bestselling kids maze activity books. Layout style: ${maze.layout}. Shape requirement: ${maze.shape}. Mission: ${maze.mission}. Build a clean 9 by 9 maze based on this exact topology blueprint: ${maze.rows.join(" / ")}. Translate the topology into the selected visual shape while keeping one continuous open route from start to goal following this solution: ${maze.route}. Use wide white corridors, thick simple black maze walls, one colorful arrow at the entrance, one colorful arrow at the exit, a small ${maze.start} icon near the start, and a small ${maze.goal} icon near the goal. Add small ${theme} themed decorations outside the maze border only. Leave blank Name and Date lines at the top, but do not render any other readable text. Do not place decorative objects inside paths. Do not create blocked exits, disconnected corridors, extra starts, extra goals, labels, captions, watermark, logo, or random text.`,answer:`Solution route: ${maze.route}.`};
+    return {...base,title:`${theme}: ${maze.layout} ${pageNumber}`,instruction:`${maze.mission} by moving from START to GOAL.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:[`MAZE LAYOUT: ${maze.layout}`,`MAZE SHAPE: ${maze.shape}`,"MAZE SIZE: 9 by 9 cells",maze.legend,...maze.rows.map((row,index)=>`MAZE ROW ${String(index+1).padStart(2,"0")}: ${row}`),`START CHARACTER: ${maze.start}`,`GOAL OBJECT: ${maze.goal}`,"START: S cell in the top-left area","GOAL: G cell in the bottom-right area",`SOLUTION ROUTE: ${maze.route}`,`SOLUTION CELLS: ${maze.cells}`],image_prompt:`Create a playable printable children's maze worksheet, vertical A4 portrait composition, inspired by bestselling kids maze activity books. Functional maze accuracy is more important than decorative shape accuracy. Layout style: ${maze.layout}. Shape requirement: ${maze.shape}. Mission: ${maze.mission}.\n\nMaze construction requirements: build one clean 9 by 9 maze from this exact topology blueprint: ${maze.rows.join(" / ")}. Treat S, dots, and G as open white corridor cells. Treat # as black wall cells. The final image must contain one continuous unbroken white corridor from START to GOAL following this exact solution route: ${maze.route}. Solution cell sequence: ${maze.cells}. Make the entrance an open gap cut through the outer border at the START side, and make the exit an open gap cut through the outer border at the GOAL side.\n\nVisual requirements: use wide white corridors, thick simple black maze walls, crisp printable line art, and generous spacing. Place one colorful arrow outside the maze pointing into the open entrance and one colorful arrow outside the maze pointing out of the open exit. Place a small ${maze.start} icon outside the maze border beside the entrance. Place a small ${maze.goal} icon outside the maze border beside the exit. Add small ${theme} themed decorations outside the maze border only.\n\nQuality check before final image: trace the path visually from the entrance to the exit. If any wall blocks the route, if the exit is sealed, or if any icon/object sits inside the corridor, redraw the maze until the route is fully solvable.\n\nText and safety rules: Leave blank Name and Date lines at the top, but do not render any other readable text. Do not place decorative objects, characters, animals, bones, food, props, labels, or shadows inside paths. Do not create blocked exits, disconnected corridors, dead-end-only starts, extra starts, extra goals, captions, watermark, logo, or random text.`,answer:`Solution route: ${maze.route}. Solution cells: ${maze.cells}.`};
   }
   return base;
 }
