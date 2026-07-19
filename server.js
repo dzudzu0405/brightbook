@@ -896,7 +896,7 @@ function fallbackPage(input,pageNumber){
     const imagePrompt=`Create a clean printable word-search worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed border decorations in the corners and margins, with a large blank central rectangle reserved for a 12 by 12 word-search grid that will be added later by layout software. Include a small blank word-list area below the grid, generous white space, simple child-friendly icons, and a polished workbook feel. Do not render any letters, words, puzzle grid, answer key, labels, captions, signage, typography, watermark, logo, or random symbols anywhere in the image.`;
     return {
       ...base,
-      title:`${theme}: ${puzzle.words[0]} Word Search`,
+      title:`${theme}: Word Search ${pageNumber}`,
       instruction:`Find the 10 hidden ${theme.toLowerCase()} words in the 12 by 12 grid. Words may go across, down, or diagonal.`,
       learning_goal:"Theme vocabulary, visual scanning, spelling, and focus.",
       content_items:[`WORD LIST: ${puzzle.words.join(", ")}`,...puzzle.rows.map((row,index)=>`GRID ROW ${String(index+1).padStart(2,"0")}: ${row}`)],
@@ -904,11 +904,49 @@ function fallbackPage(input,pageNumber){
       answer:`ANSWER KEY: ${puzzle.answers.join("; ")}.`
     };
   }
+  if(input.activityType==="matching"){
+    const words=[...new Set(wordBank(theme))].slice(pageNumber%5,pageNumber%5+6);
+    const pairs=words.map(word=>`${word} -> ${word.toLowerCase()} picture`);
+    const right=[...words].reverse().map(word=>`${word.toLowerCase()} picture`);
+    return {...base,title:`${theme}: Matching Set ${pageNumber}`,instruction:`Draw a line from each ${theme.toLowerCase()} word to its matching picture.`,learning_goal:"Theme vocabulary, visual discrimination, and matching skills.",content_items:[`LEFT COLUMN: ${words.join(", ")}`,`RIGHT COLUMN DISPLAY ORDER: ${right.join(", ")}`,`PAIRS: ${pairs.join("; ")}`],image_prompt:`Create a clean printable matching worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed decorative icons around the margins and leave two large blank columns for text and picture cards that will be added later by layout software. Keep the center open for connecting lines. Do not render words, letters, labels, numbers, answer keys, watermark, logo, or random symbols.`,answer:`Correct matches: ${pairs.join("; ")}.`};
+  }
+  if(input.activityType==="counting"){
+    const words=[...new Set(wordBank(theme))];
+    const item=words[(pageNumber-1)%words.length]||"OBJECT";
+    const qty=3+((pageNumber-1)%8);
+    return {...base,title:`${theme}: Count ${item} ${pageNumber}`,instruction:`Count the ${item.toLowerCase()} objects and write the number.`,learning_goal:"Counting accuracy, one-to-one correspondence, and theme vocabulary.",content_items:[`COUNTING OBJECT: ${item}`,`EXACT QUANTITY: ${qty}`,`DISPLAY RULE: show ${qty} separate, fully visible ${item.toLowerCase()} objects with no overlaps`],image_prompt:`Create a clean printable counting worksheet scene for children, vertical A4 portrait composition. Show exactly ${qty} separate, fully visible ${item.toLowerCase()} objects in a simple ${theme} setting, with generous spacing and one blank answer box. Use child-friendly line art or workbook illustration styling. Do not render numerals, written labels, captions, watermark, logo, or random text.`,answer:`Answer: ${qty}.`};
+  }
+  if(input.activityType==="simple-math"){
+    const a=2+((pageNumber*2)%9),b=1+(pageNumber%7);
+    const op=pageNumber%3===0?"-":"+";
+    const left=op==="-"?Math.max(a,b):a;
+    const right=op==="-"?Math.min(a,b):b;
+    const result=op==="+"?left+right:left-right;
+    return {...base,title:`${theme}: Math Practice ${pageNumber}`,instruction:`Solve the ${theme.toLowerCase()} math problem, then check your answer.`,learning_goal:"Basic arithmetic, number sense, and problem solving.",content_items:[`PROBLEM: ${left} ${op} ${right} = ____`,`VISUAL MANIPULATIVES: ${left} ${theme.toLowerCase()} counters and ${right} more/removed counters`,`OPERATION: ${op==="+"?"addition":"subtraction"}`],image_prompt:`Create a clean printable math worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed counters and simple decorative margin elements, with a large blank problem area and answer box that will be filled by layout software. Do not render arithmetic symbols, numerals, letters, labels, captions, watermark, logo, or random text.`,answer:`Answer: ${result}.`};
+  }
+  if(input.activityType==="spot-difference"){
+    const differences=["one extra cloud","missing small flower","different tail position","one object turned sideways","extra pebble near the path","different window shape"];
+    return {...base,title:`${theme}: Spot Differences ${pageNumber}`,instruction:`Look at the two ${theme.toLowerCase()} scenes and find all 6 differences.`,learning_goal:"Observation, attention to detail, comparison, and visual memory.",content_items:[`PANEL A: ${baseScene}`,`PANEL B: same scene with exactly these differences`,...differences.map((item,index)=>`DIFFERENCE ${index+1}: ${item}`)],image_prompt:`Create a printable spot-the-difference worksheet layout for children, vertical A4 portrait composition. Show two side-by-side ${theme} scene panels with identical camera angle, matching character placement, and clear simple details. Include exactly these visual changes between panels: ${differences.join(", ")}. Do not render labels, captions, letters, numbers, watermark, logo, or random text.`,answer:`Differences: ${differences.join("; ")}.`};
+  }
+  if(input.activityType==="puzzle"){
+    const words=[...new Set(wordBank(theme))].slice(0,4);
+    const oddChoices=["PENCIL","SHOE","CHAIR","BUTTON","UMBRELLA"];
+    const odd=oddChoices[(pageNumber-1)%oddChoices.length];
+    return {...base,title:`${theme}: Odd One Out ${pageNumber}`,instruction:`Circle the item that does not belong, then explain why.`,learning_goal:"Classification, reasoning, theme vocabulary, and critical thinking.",content_items:[`PUZZLE MECHANIC: Odd one out`,`CHOICES: ${words.join(", ")}, ${odd}`,`CORRECT ANSWER: ${odd}`,`REASON: the other choices are ${theme.toLowerCase()} vocabulary items, while ${odd.toLowerCase()} is not part of this theme set`],image_prompt:`Create a clean printable children's puzzle worksheet frame, vertical A4 portrait composition. Use small ${theme} themed border decorations and leave four blank choice cards plus one answer circle area for layout software. Keep the composition simple and uncluttered. Do not render words, letters, numbers, labels, captions, watermark, logo, or random symbols.`,answer:`Answer: ${odd} is the odd one out.`};
+  }
+  if(input.activityType==="learning-worksheet"){
+    const words=[...new Set(wordBank(theme))].slice(0,3);
+    return {...base,title:`${theme}: Worksheet ${pageNumber}`,instruction:`Complete the ${theme.toLowerCase()} vocabulary activities.`,learning_goal:"Vocabulary recognition, categorization, early writing, and comprehension.",content_items:[`TASK 1: Circle the ${words[0]} picture`,`TASK 2: Match ${words[1]} to its picture`,`TASK 3: Draw one ${words[2]} in the blank box`,`ANSWER 1: ${words[0]}`,`ANSWER 2: ${words[1]} matches its picture`,`ANSWER 3: drawing should clearly show ${words[2]}`],image_prompt:`Create a clean printable educational worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed decorations around the margins, three clear blank task sections, one drawing box, and generous writing space. Do not render exact words, letters, answers, labels, captions, watermark, logo, or random text.`,answer:`Answers: ${words[0]}; ${words[1]} matches its picture; drawing should show ${words[2]}.`};
+  }
+  if(input.activityType==="educational-story"){
+    return {...base,title:`${theme}: Story Scene ${pageNumber}`,instruction:`Read the short scene and discuss the gentle lesson.`,learning_goal:"Reading comprehension, sequencing, empathy, and theme vocabulary.",content_items:[`STORY SCENE: A friendly guide explores ${baseScene}`,`PLOT ROLE: ${pageNumber===1?"opening":pageNumber<input.pageCount?"middle adventure":"gentle conclusion"}`,`TAKEAWAY: notice details, ask questions, and help a friend`],image_prompt:`Create a warm children's storybook illustration, vertical A4 portrait composition. Scene: a friendly recurring child guide explores ${baseScene}. Keep expressions gentle, composition clear, and details age-appropriate. Include rich ${theme} atmosphere, but do not render readable text, labels, signage, watermark, logo, or random symbols.`,answer:"Takeaway: notice details, ask kind questions, and help when a friend needs support."};
+  }
   if(input.activityType==="tracing"){
-    return {...base,instruction:`Trace the ${theme} vocabulary words, then write them once on your own.`,content_items:[`Trace: ${theme}`,`Trace: learn`,`Trace: explore`],answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly."};
+    const words=[...new Set(wordBank(theme))].slice(0,3);
+    return {...base,title:`${theme}: Trace Set ${pageNumber}`,instruction:`Trace the ${theme.toLowerCase()} vocabulary words, then write each word once on your own.`,learning_goal:"Letter formation, handwriting confidence, and theme vocabulary.",content_items:[`TRACE WORD 1: ${words[0]}`,`TRACE WORD 2: ${words[1]}`,`TRACE WORD 3: ${words[2]}`,`WRITING SPACE: one blank line after each word`],image_prompt:`Create a clean printable handwriting worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed decorations around the margins and leave three wide blank tracing rows plus independent writing lines for layout software. Do not render letters, dotted words, labels, captions, watermark, logo, or random text.`,answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly on the blank line."};
   }
   if(input.activityType==="maze"){
-    return {...base,instruction:`Help the character move through the ${theme} maze from start to finish.`,content_items:["Start: top left","Goal: bottom right","Route: R, R, D, D, R, D"],answer:"Solution route: R, R, D, D, R, D."};
+    return {...base,title:`${theme}: Maze Path ${pageNumber}`,instruction:`Help the character move through the ${theme.toLowerCase()} maze from start to finish.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:["START: top left","GOAL: bottom right","OBSTACLES: themed objects stay outside the path","ROUTE: R, R, D, D, R, D"],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition. Build a simple solvable maze with wide clean paths, start area at top left, goal area at bottom right, and ${theme} themed decorations outside the paths only. Do not place decorative objects inside paths. Do not render letters, labels, captions, watermark, logo, or random text.`,answer:"Solution route: R, R, D, D, R, D."};
   }
   return base;
 }
