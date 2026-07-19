@@ -125,6 +125,8 @@ const THEME_ALIASES={
   "Halloween":["halloween","pumpkin","ghost","witch"]
 };
 const ACTIVITY_TYPES=["word-search","coloring","maze","tracing","matching","counting","learning-worksheet"];
+const HIDDEN_ACTIVITY_TYPES=new Set(["maze"]);
+const PUBLIC_ACTIVITY_TYPES=ACTIVITY_TYPES.filter(type=>!HIDDEN_ACTIVITY_TYPES.has(type));
 const GENRE_TYPES=[
   "Classic Educational",
   "Cinematic Adventure",
@@ -228,15 +230,15 @@ function compatibleThemesForGenre(genreType){
 }
 function compatibleActivitiesForGenre(genreType){
   const g=String(genreType||"Classic Educational").toLowerCase();
-  if(g==="cinematic adventure")return ["coloring","maze"];
-  if(g==="fantasy storybook")return ["coloring","maze","matching"];
+  if(g==="cinematic adventure")return ["coloring"];
+  if(g==="fantasy storybook")return ["coloring","matching"];
   if(g==="documentary style")return ["word-search","coloring","matching","learning-worksheet"];
   if(g==="cozy storybook")return ["coloring","tracing","matching","counting","learning-worksheet"];
   if(g==="science explorer")return ["word-search","coloring","matching","counting","learning-worksheet"];
-  if(g==="magical world")return ["coloring","maze","matching","counting"];
+  if(g==="magical world")return ["coloring","matching","counting"];
   if(g==="realistic classroom")return ["word-search","tracing","matching","counting","learning-worksheet"];
   if(g==="vintage workbook")return ["word-search","tracing","matching","counting","learning-worksheet"];
-  return ACTIVITY_TYPES;
+  return PUBLIC_ACTIVITY_TYPES;
 }
 function isGenreCompatible(activityType,theme,genreType){
   const activities=compatibleActivitiesForGenre(genreType);
@@ -314,7 +316,7 @@ function seedBilling() {
   }
   const insertFeature = db.prepare("INSERT OR IGNORE INTO features(feature_key,name,description,category,active) VALUES(?,?,?,?,1)");
   for (const f of features) insertFeature.run(...f);
-  const supportedActivityKeys = ACTIVITY_TYPES.map(type=>`activity.${type}`);
+  const supportedActivityKeys = PUBLIC_ACTIVITY_TYPES.map(type=>`activity.${type}`);
   db.prepare(`
     UPDATE features
     SET active = CASE WHEN feature_key IN (${supportedActivityKeys.map(()=>"?").join(",")}) THEN 1 ELSE 0 END
@@ -327,7 +329,7 @@ function seedBilling() {
   const enable = db.prepare("INSERT OR IGNORE INTO plan_features(plan_id,feature_id,enabled) VALUES(?,?,1)");
   const setPlanFeatures = db.prepare("DELETE FROM plan_features WHERE plan_id=?");
   const starter = ["activity.coloring","activity.word-search","quantity.25","export.txt","export.json"];
-  const pro = starter.concat(["activity.maze","activity.tracing","activity.matching","activity.counting","quantity.30","advanced.custom-direction"]);
+  const pro = starter.concat(["activity.tracing","activity.matching","activity.counting","quantity.30","advanced.custom-direction"]);
   const publisher = pro.concat(["activity.learning-worksheet","export.save-project","kit.listing-assets","kit.quality-check","kit.series-builder","kit.launch-checklist"]);
   for (const plan of allPlans) {
     const starterThemes = THEME_GROUPS.slice(0,2).flatMap(([,items])=>items).map(themeFeatureKey);
@@ -1391,7 +1393,7 @@ async function api(req,res,pathname){
   }
   if(pathname==="/api/catalog"&&req.method==="GET"){
     return json(res,200,{
-      activities:ACTIVITY_TYPES.map(type=>({type,featureKey:`activity.${type}`})),
+      activities:PUBLIC_ACTIVITY_TYPES.map(type=>({type,featureKey:`activity.${type}`})),
       themes:THEME_GROUPS.flatMap(([category,items])=>items.map(name=>({name,category,featureKey:themeFeatureKey(name),compatibleActivityTypes:compatibleActivityTypes(name)}))),
       genres:GENRE_TYPES.map(name=>({name,compatibleActivityTypes:compatibleActivitiesForGenre(name),compatibleThemes:compatibleThemesForGenre(name)})),
       mazeLayouts:MAZE_LAYOUT_TYPES,
