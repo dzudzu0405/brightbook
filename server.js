@@ -910,6 +910,22 @@ function ageLabel(age=""){
   const match=String(age).match(/\d+\s*[–-]\s*\d+/);
   return match?`Ages ${match[0].replace(/\s+/g,"")}`:String(age||"Kids").replace(/\byears?\b/i,"").trim();
 }
+function etsyTitleFor(input,{niche,theme,activityLabel,keywords}){
+  const mode=String(input.displayGenre||input.genreType||"").replace(/Classic Educational/i,"").trim();
+  const style=input.activityType==="coloring"
+    ? "Bold and Easy"
+    : input.activityType==="tracing"
+      ? "Handwriting Practice"
+      : "Printable Kids Workbook";
+  const base=`${niche} ${activityLabel}`;
+  const keywordText=keywords
+    .map(item=>titleCase(item))
+    .filter(item=>item&&!base.toLowerCase().includes(item.toLowerCase()))
+    .slice(0,3)
+    .join(", ");
+  return [`${base} PDF`,keywordText||`${theme} Activity Pages`,mode||style,"Printable Kids Pages","Digital Download"]
+    .filter(Boolean).join(", ").replace(/\s+/g," ").slice(0,140);
+}
 function ensurePublishingKit(book,input){
   const theme=String(input.theme||input.topic||"Activity Book");
   const activity=String(input.activityType||"activity").replace(/-/g," ");
@@ -921,13 +937,14 @@ function ensurePublishingKit(book,input){
   const kdpTitle=`${niche} ${activityLabel} for Kids ${age}`.replace(/\s+/g," ").slice(0,180);
   const kdpSubtitle=`Fun ${theme} activity pages for ${input.age} with clear prompts, answer guidance, and publishing-ready planning`.slice(0,200);
   const keywords=(Array.isArray(book.keywords)&&book.keywords.length?book.keywords:[theme,`${theme} activity book`,`${activity} book`,`${input.age} activities`]).slice(0,8);
+  const etsyTitle=etsyTitleFor(input,{niche,theme,activityLabel,keywords});
   if(/\bkit$/i.test(String(book.book_title||"")))book.book_title=title;
   const listingDefaults={
     kdp_title:kdpTitle,
     kdp_subtitle:kdpSubtitle,
     kdp_description:`${kdpTitle} is a themed ${activityLabel.toLowerCase()} for ${input.age}. It includes structured page ideas, clear instructions, answer guidance where needed, cover direction, keywords, and launch planning notes to help sellers prepare a polished activity book for KDP, Etsy, Gumroad, or classroom marketplaces. Review the pages, create the final artwork, verify print settings, and customize the listing before publishing.`,
     backend_keywords:Array.from({length:7},(_,i)=>keywords[i]||`${theme} printable activity ${i+1}`),
-    etsy_title:`${niche} ${activityLabel} Printable, ${theme} Kids Workbook Pages, Activity Book PDF`,
+    etsy_title:etsyTitle,
     etsy_tags:[theme,"activity book","printable kids","kids worksheet","kdp interior","etsy printable",activity,"homeschool","classroom","coloring pages","busy book","learning fun","digital download"].slice(0,13),
     short_blurb:`A ${theme} ${activity} kit with page prompts, answer keys, cover direction, and launch-ready marketplace assets.`,
     a_plus_sections:[
