@@ -392,54 +392,19 @@ function renderPublishingKit(book){
   $("#seriesIdeas").innerHTML=listHtml(book.series_ideas||[]);
   $("#publishingChecklist").innerHTML=listHtml(book.publishing_checklist||[]);
 }
-function pageContentText(page){return (page?.content_items||[]).join("\n")}
-function selectedPage(){return current?.pages?.[selectedPageIndex]||current?.pages?.[0]}
-function renderSelectedPage(){
-  const page=selectedPage();
-  if(!page)return;
-  $("#selectedPageLabel").textContent=`Page ${selectedPageIndex+1}`;
-  $("#pagePreview").innerHTML=`
-    <small>${esc(typeNames[page.activity_type]||page.activity_type)} · Page ${selectedPageIndex+1}</small>
-    <h4>${esc(page.title)}</h4>
-    <p class="preview-instruction">${esc(page.instruction)}</p>
-    <div class="preview-content">
-      ${(page.content_items||[]).slice(0,7).map(item=>`<span>${esc(item)}</span>`).join("")}
-    </div>
-    <div class="preview-footer">
-      <span>A4 Portrait</span><span>Answer Key Included</span>
-    </div>
-  `;
-  $$(".strip-page").forEach(button=>button.classList.toggle("active",Number(button.dataset.pageIndex)===selectedPageIndex));
-}
 function renderPageWorkspace(book){
   selectedPageIndex=0;
-  $("#pageStrip").innerHTML=book.pages.map((page,index)=>`
-    <button class="strip-page" type="button" data-page-index="${index}">
-      <span>${index+1}</span>
-      <small>${esc(page.title).slice(0,32)}</small>
-    </button>
-  `).join("");
   $("#pageList").innerHTML=book.pages.map((p,n)=>`<article class="page-card" data-page-card="${n}"><header><b>${n+1}</b><div><strong>${esc(p.title)}</strong><small>${esc(typeNames[p.activity_type]||p.activity_type)} · ${esc(p.learning_goal)}</small></div><button data-copy-page="${n}" title="Copy image prompt">Copy</button></header><p>${esc(p.instruction)}</p><details><summary>View content, image prompt, and answer</summary><div class="page-details"><span>PAGE CONTENT</span><p>${p.content_items.map(esc).join(" · ")}</p><span>IMAGE PROMPT</span><p>${esc(p.image_prompt)}</p><span>ANSWER KEY</span><p class="answer">${esc(p.answer)}</p></div></details></article>`).join("");
-  $$(".strip-page").forEach(button=>button.addEventListener("click",()=>{
-    selectedPageIndex=Number(button.dataset.pageIndex);
-    renderSelectedPage();
-    document.querySelector(`[data-page-card="${selectedPageIndex}"]`)?.scrollIntoView({block:"nearest",behavior:"smooth"});
-  }));
   $$("[data-copy-page]").forEach(b=>b.addEventListener("click",async()=>{
     selectedPageIndex=Number(b.dataset.copyPage);
-    renderSelectedPage();
     await navigator.clipboard.writeText(book.pages[selectedPageIndex].image_prompt);
     toast("Image prompt copied");
   }));
-  renderSelectedPage();
 }
 function render(book){$("#loading").classList.add("hidden");$("#result").classList.remove("hidden");$("#bookTitle").textContent=book.book_title;$("#bookSubtitle").textContent=book.subtitle;$("#bookDescription").textContent=book.description;$("#metaAge").textContent=currentSettings.age;$("#metaPages").textContent=`${book.pages.length} pages`;$("#metaGenre").textContent=currentSettings.displayGenre||currentSettings.genreType||currentSettings.difficulty;$("#coverPrompt").textContent=book.cover_prompt;$("#keywords").innerHTML=tagHtml(book.keywords||[]);renderPublishingKit(book);renderPageWorkspace(book)}
 $$(".tabs button").forEach(b=>b.addEventListener("click",()=>{$$(".tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");["pages","cover","listing","quality"].forEach(tab=>$(`#${tab}Tab`).classList.toggle("hidden",b.dataset.tab!==tab))}));
 $("[data-copy=cover]").addEventListener("click",async()=>{if(current){await navigator.clipboard.writeText(current.cover_prompt);toast("Cover prompt copied")}});
 $("[data-copy=kdpDescription]")?.addEventListener("click",async()=>{if(current?.listing_assets?.kdp_description){await navigator.clipboard.writeText(current.listing_assets.kdp_description);toast("KDP description copied")}});
-$("#copySelectedPrompt")?.addEventListener("click",async()=>{const page=selectedPage();if(!page)return;await navigator.clipboard.writeText(page.image_prompt||"");toast("Selected page prompt copied")});
-$("#copySelectedContent")?.addEventListener("click",async()=>{const page=selectedPage();if(!page)return;await navigator.clipboard.writeText(pageContentText(page));toast("Selected page content copied")});
-$("#copySelectedAnswer")?.addEventListener("click",async()=>{const page=selectedPage();if(!page)return;await navigator.clipboard.writeText(page.answer||"");toast("Selected answer copied")});
 $("#saveProject").addEventListener("click",async()=>{if(!current)return;try{await api("/api/projects",{method:"POST",body:JSON.stringify({book:current,settings:currentSettings})});toast("Project saved","Your project is ready in Saved Projects.")}catch(e){toast("Unable to save",e.message)}});
 async function loadProjects(){try{const d=await api("/api/projects");$("#projectGrid").innerHTML=d.items.length?d.items.map(p=>`<article class="project-card"><span class="eyebrow">ACTIVITY BOOK</span><h3>${esc(p.title)}</h3><p>${esc(p.settings.topic||"")} ? ${p.book.pages.length} pages</p><footer><span>${new Date((p.createdAt+"Z").replace(" ","T")).toLocaleDateString("en-US")}</span><button data-open="${p.id}">Open -></button></footer></article>`).join(""):`<p>No saved projects yet.</p>`;$$("[data-open]").forEach(b=>b.addEventListener("click",()=>{const p=d.items.find(x=>x.id===Number(b.dataset.open));current=p.book;currentSettings=p.settings;render(current);showView("creator")}))}catch(e){toast("Unable to load projects",e.message)}}
 function download(name,text,type="text/plain"){const blob=new Blob([text],{type:`${type};charset=utf-8`}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href)}
