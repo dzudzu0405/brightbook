@@ -2,6 +2,8 @@
 let current=null,currentSettings=null;
 let accountFeatures=new Set();
 let accountUser=null;
+let accountLoaded=false;
+let accountLoadPromise=null;
 let catalog={themes:[],activities:[]};
 let engineReady=null;
 const views={creator:$("#creatorView"),projects:$("#projectsView"),templates:$("#templatesView")};
@@ -141,7 +143,22 @@ function renderAccount(user){
   $("#accountMenuPlan").textContent=user.planName||"Creator";
   $("#accountStatus").textContent=user.status==="active"?"Active account":"Paused account";
 }
-async function loadAccount(){try{catalog=await api("/api/catalog");const d=await api("/api/me");accountFeatures=new Set(d.user.features||[]);renderAccount(d.user);applyFeatureGates()}catch(e){toast("Account unavailable",e.message)}}
+async function loadAccount(){
+  accountLoadPromise=(async()=>{
+    try{
+      catalog=await api("/api/catalog");
+      const d=await api("/api/me");
+      accountFeatures=new Set(d.user.features||[]);
+      accountLoaded=true;
+      renderAccount(d.user);
+      applyFeatureGates();
+    }catch(e){
+      accountLoaded=false;
+      toast("Account unavailable",e.message);
+    }
+  })();
+  return accountLoadPromise;
+}
 function setPlainOptions(select,items,current){
   select.innerHTML=items.map(item=>`<option value="${esc(item.value)}">${esc(item.label)}</option>`).join("");
   if(items.some(item=>item.value===current))select.value=current;
@@ -218,6 +235,10 @@ function applyFeatureGates(){
   document.querySelector('[data-tab="listing"]')?.classList.toggle("hidden",!canListing);
   document.querySelector('[data-tab="quality"]')?.classList.toggle("hidden",!canQuality);
 }
+function selectedActivityAllowed(){
+  const activity=$("#activityType").value;
+  return !accountLoaded || hasFeature(`activity.${activity}`);
+}
 function toast(title,msg="",duration=3000){const t=$("#toast");t.querySelector("strong").textContent=title;t.querySelector("small").textContent=msg;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),duration)}
 function showView(name){Object.values(views).forEach(v=>v.classList.remove("active"));views[name].classList.add("active");$("#pageTitle").textContent=titles[name];$$("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));$(".sidebar").classList.remove("open");if(name==="projects")loadProjects();window.scrollTo({top:0,behavior:"smooth"})}
 $$("nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));$(".menu").addEventListener("click",()=>$(".sidebar").classList.toggle("open"));$("#newBook").addEventListener("click",()=>{reset();showView("creator")});
@@ -243,7 +264,7 @@ function normalizeSelections(){
   if(!$("#pageCount").value&&$("#pageCount option"))$("#pageCount").value=$("#pageCount option").value;
   if(!$("#genreType").value&&$("#genreType option"))$("#genreType").value=$("#genreType option").value;
 }
-async function generateProductKit(){normalizeSelections();currentSettings=settings();$("#emptyPreview").classList.add("hidden");$("#result").classList.add("hidden");$("#loading").classList.remove("hidden");$("#loadingText").textContent="Starting the product kit generator";const btn=$("#generate");btn.disabled=true;btn.classList.add("loading");btn.querySelector("strong").textContent="Generating...";const msgs=["Preparing the first product kit batch","Building unique concepts for your theme","Writing consistent image prompts","Creating answer keys and learning goals","Drafting listing assets and keywords","Checking the complete publishing kit"];let i=0;const timer=setInterval(()=>$("#loadingText").textContent=msgs[++i%msgs.length],5000);try{if(engineReady===false)await health();if(engineReady===false)throw new Error("The local content engine is not ready. Please start Ollama and make sure the selected model is installed.");const d=await api("/api/generate",{method:"POST",body:JSON.stringify(currentSettings)});current=d.book;if(!current.pages||current.pages.length!==currentSettings.pageCount)throw new Error(`Expected ${currentSettings.pageCount} prompts, but received ${current.pages?.length||0}. Please generate again.`);render(current);toast("Your product kit is ready",`${current.pages.length} pages were created.`)}catch(e){$("#loading").classList.add("hidden");$("#emptyPreview").classList.remove("hidden");toast("Unable to create your product kit",e.message,9000)}finally{clearInterval(timer);btn.disabled=false;btn.classList.remove("loading");btn.querySelector("strong").textContent="Generate Product Kit"}}
+async function generateProductKit(){if(!accountLoaded&&accountLoadPromise)await accountLoadPromise;normalizeSelections();if(!selectedActivityAllowed()){const locked=$("#activityType").value;applyFeatureGates();toast("Activity locked",`${typeNames[locked]||locked} is not included in your current plan.`,7000);return}currentSettings=settings();$("#emptyPreview").classList.add("hidden");$("#result").classList.add("hidden");$("#loading").classList.remove("hidden");$("#loadingText").textContent="Starting the product kit generator";const btn=$("#generate");btn.disabled=true;btn.classList.add("loading");btn.querySelector("strong").textContent="Generating...";const msgs=["Preparing the first product kit batch","Building unique concepts for your theme","Writing consistent image prompts","Creating answer keys and learning goals","Drafting listing assets and keywords","Checking the complete publishing kit"];let i=0;const timer=setInterval(()=>$("#loadingText").textContent=msgs[++i%msgs.length],5000);try{if(engineReady===false)await health();if(engineReady===false)throw new Error("The local content engine is not ready. Please start Ollama and make sure the selected model is installed.");const d=await api("/api/generate",{method:"POST",body:JSON.stringify(currentSettings)});current=d.book;if(!current.pages||current.pages.length!==currentSettings.pageCount)throw new Error(`Expected ${currentSettings.pageCount} prompts, but received ${current.pages?.length||0}. Please generate again.`);render(current);toast("Your product kit is ready",`${current.pages.length} pages were created.`)}catch(e){$("#loading").classList.add("hidden");$("#emptyPreview").classList.remove("hidden");toast("Unable to create your product kit",e.message,9000)}finally{clearInterval(timer);btn.disabled=false;btn.classList.remove("loading");btn.querySelector("strong").textContent="Generate Product Kit"}}
 $("#generate").addEventListener("click",generateProductKit);
 function listHtml(items=[]){return items.length?items.map(item=>`<li>${esc(item)}</li>`).join(""):"<li>No issues found.</li>"}
 function tagHtml(items=[]){return items.map(item=>`<span>${esc(item)}</span>`).join("")}
