@@ -159,6 +159,12 @@ function featureSlug(value=""){
 function normText(value=""){
   return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim();
 }
+function textHasTerm(text,term){
+  const normalized=normText(term);
+  if(!normalized)return false;
+  if(normalized.includes(" "))return text.includes(normalized);
+  return text.split(/\s+/).includes(normalized);
+}
 function detectThemeFromIdea(idea,activityType="",genreType=""){
   const text=normText(idea);
   if(!text)return "";
@@ -171,11 +177,11 @@ function detectThemeFromIdea(idea,activityType="",genreType=""){
   const scored=candidates.map(theme=>{
     const name=normText(theme);
     const tokens=name.split(" ").filter(token=>token.length>2);
-    let score=text.includes(name)?12:0;
-    for(const token of tokens)if(text.includes(token))score+=2;
+    let score=textHasTerm(text,name)?12:0;
+    for(const token of tokens)if(textHasTerm(text,token))score+=2;
     for(const alias of THEME_ALIASES[theme]||[]){
       const normalized=normText(alias);
-      if(text.includes(normalized))score+=normalized.includes(" ")?8:5;
+      if(textHasTerm(text,normalized))score+=normalized.includes(" ")?8:5;
     }
     return {theme,score};
   }).sort((a,b)=>b.score-a.score);
@@ -396,7 +402,7 @@ function planFeatureKeys(planId) {
 }
 function requiredFeatureKeys(input) {
   const keys = [`activity.${input.activityType}`, `quantity.${input.pageCount}`];
-  if (input.theme) keys.push(themeFeatureKey(input.theme));
+  if (input.theme && input.theme !== "Custom Idea") keys.push(themeFeatureKey(input.theme));
   if (String(input.customDirection || "").trim()) keys.push("advanced.custom-direction");
   if (String(input.avoidTerms || "").trim()) keys.push("advanced.custom-direction");
   if (String(input.learningGoal || "").trim()) keys.push("advanced.learning-goal");
@@ -1037,9 +1043,12 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
   } finally { clearTimeout(timeout); }
 }
 function fallbackPage(input,pageNumber){
-  const theme=input.theme||input.topic||"Activity";
+  const theme=input.theme==="Custom Idea" ? (input.topic||input.bookIdea||"Custom Idea") : (input.theme||input.topic||"Activity");
   const activity=String(input.activityType||"activity").replace(/-/g," ");
-  const scenePool=themeScenePool(theme);
+  const isCustomIdea=input.theme==="Custom Idea";
+  const scenePool=isCustomIdea
+    ? Array.from({length:25},(_,index)=>`${theme} scene ${index+1} with a clear main subject, niche-specific props, child-friendly details, printable white space, and a fresh page concept`)
+    : themeScenePool(theme);
   const baseScene=scenePool[(pageNumber-1)%scenePool.length];
   const idea=String(input.bookIdea||"").trim();
   const direction=String(input.customDirection||"").trim();
@@ -1115,7 +1124,7 @@ function fallbackPage(input,pageNumber){
   return base;
 }
 function generateFallbackBook(input,reason=""){
-  const theme=input.theme||input.topic||"Activity";
+  const theme=input.theme==="Custom Idea" ? (input.topic||input.bookIdea||"Custom Idea") : (input.theme||input.topic||"Activity");
   const activity=String(input.activityType||"activity").replace(/-/g," ");
   const idea=String(input.bookIdea||"").trim();
   const pages=Array.from({length:input.pageCount},(_,index)=>fallbackPage(input,index+1));
@@ -1207,13 +1216,16 @@ function validate(input){
   if(detectedTheme){
     input.theme=detectedTheme;
     input.topic=detectedTheme;
+  } else if(input.bookIdea){
+    input.theme="Custom Idea";
+    input.topic=input.bookIdea;
   }
   if(!input.theme)input.theme=String(input.topic||"").trim();
   if(!input.topic)input.topic=input.theme;
   if(!input.topic||input.topic.length<3)throw new Error("Please enter a book idea so BrightBook can detect a theme.");
-  if(!input.theme)throw new Error("BrightBook could not detect a theme from your book idea.");
-  if(!isCompatible(input.activityType,input.theme))throw new Error(`The detected theme is not a good fit for ${input.activityType}. Please adjust your book idea.`);
-  if(!isGenreCompatible(input.activityType,input.theme,input.genreType))throw new Error(`The selected type / genre is not a good fit for ${input.activityType} with ${input.theme}. Please choose another combination.`);
+  if(!input.theme)input.theme="Custom Idea";
+  if(input.theme!=="Custom Idea"&&!isCompatible(input.activityType,input.theme))throw new Error(`The detected theme is not a good fit for ${input.activityType}. Please adjust your book idea.`);
+  if(input.theme!=="Custom Idea"&&!isGenreCompatible(input.activityType,input.theme,input.genreType))throw new Error(`The selected type / genre is not a good fit for ${input.activityType} with ${input.theme}. Please choose another combination.`);
   input.mazeLayout=String(input.mazeLayout||"Mixed Marketplace Variety").trim();
   if(input.activityType==="maze"&&!MAZE_LAYOUT_TYPES.includes(input.mazeLayout))throw new Error("Please select a valid maze layout / style.");
   if(input.activityType!=="maze")input.mazeLayout="";

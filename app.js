@@ -92,6 +92,12 @@ function hasFeature(key){return accountFeatures.has(key)}
 function themeInfo(name){return catalog.themes.find(t=>t.name===name)}
 function genreInfo(name){return catalog.genres?.find(g=>g.name===name)}
 function normText(value=""){return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim()}
+function textHasTerm(text,term){
+  const normalized=normText(term);
+  if(!normalized)return false;
+  if(normalized.includes(" "))return text.includes(normalized);
+  return text.split(/\s+/).includes(normalized);
+}
 function activityGenreOptions(activity){
   if(activity==="word-search")return catalog.wordSearchModes?.length?catalog.wordSearchModes:WORD_SEARCH_MODE_TYPES;
   if(activity==="maze")return catalog.mazeLayouts?.length?catalog.mazeLayouts:DEFAULT_MAZE_LAYOUT_TYPES;
@@ -120,19 +126,21 @@ function detectThemeFromIdea(idea,themes){
   const scored=themes.map(t=>{
     const name=normText(t.name);
     const tokens=name.split(" ").filter(token=>token.length>2);
-    let score=text.includes(name)?12:0;
-    for(const token of tokens)if(text.includes(token))score+=2;
+    let score=textHasTerm(text,name)?12:0;
+    for(const token of tokens)if(textHasTerm(text,token))score+=2;
     for(const alias of THEME_ALIASES[t.name]||[]){
       const normalized=normText(alias);
-      if(text.includes(normalized))score+=normalized.includes(" ")?8:5;
+      if(textHasTerm(text,normalized))score+=normalized.includes(" ")?8:5;
     }
     return {theme:t.name,score};
   }).sort((a,b)=>b.score-a.score);
-  return scored[0]?.score>0?scored[0].theme:(themes.find(t=>t.name===$("#theme").value)?.name||themes[0].name);
+  return scored[0]?.score>0?scored[0].theme:"Custom Idea";
 }
 function updateDetectedTheme(theme,source=""){
   $("#detectedThemeName").textContent=theme||"Waiting for idea";
-  $("#detectedThemeHelp").textContent=source==="idea"
+  $("#detectedThemeHelp").textContent=source==="custom"
+    ? "No exact theme matched. BrightBook will use your book idea as the main niche."
+    : source==="idea"
     ? "Matched from your book idea. BrightBook will keep every prompt anchored to this theme."
     : "Type a book idea and BrightBook will match it to the closest available theme.";
 }
@@ -216,8 +224,8 @@ function applyFeatureGates(){
   if(!themes.length&&!hasLoadedFeatures)themes=THEME_GROUP_FALLBACK.filter(t=>t.compatibleActivityTypes.includes(activity));
   setThemeOptions(themes,previous.theme);
   const detectedTheme=detectThemeFromIdea($("#bookIdea")?.value||"",themes);
-  if(detectedTheme)$("#theme").value=detectedTheme;
-  updateDetectedTheme($("#theme").value,$("#bookIdea")?.value.trim()?"idea":"default");
+  if(detectedTheme&&detectedTheme!=="Custom Idea")$("#theme").value=detectedTheme;
+  updateDetectedTheme(detectedTheme==="Custom Idea"?"Custom Idea":$("#theme").value,$("#bookIdea")?.value.trim()?(detectedTheme==="Custom Idea"?"custom":"idea"):"default");
 
   let theme=$("#theme").value;
   genreOptions=activityGenreOptions(activity);
@@ -241,8 +249,8 @@ function applyFeatureGates(){
   if(!themes.length&&!hasLoadedFeatures)themes=THEME_GROUP_FALLBACK.filter(t=>t.compatibleActivityTypes.includes(activity));
   setThemeOptions(themes,$("#theme").value);
   const finalDetectedTheme=detectThemeFromIdea($("#bookIdea")?.value||"",themes);
-  if(finalDetectedTheme)$("#theme").value=finalDetectedTheme;
-  updateDetectedTheme($("#theme").value,$("#bookIdea")?.value.trim()?"idea":"default");
+  if(finalDetectedTheme&&finalDetectedTheme!=="Custom Idea")$("#theme").value=finalDetectedTheme;
+  updateDetectedTheme(finalDetectedTheme==="Custom Idea"?"Custom Idea":$("#theme").value,$("#bookIdea")?.value.trim()?(finalDetectedTheme==="Custom Idea"?"custom":"idea"):"default");
   const finalGenreOptions=activityGenreOptions(activity);
   if(!finalGenreOptions.includes($("#genreType").value)){
     setPlainOptions($("#genreType"),finalGenreOptions.map(value=>({value,label:value})),finalGenreOptions[0]);
@@ -288,14 +296,17 @@ $("#sidebarSearch")?.addEventListener("input",e=>{
 $$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#bookIdea").value=`${b.dataset.theme}: ${b.dataset.template}`;showView("creator");applyFeatureGates()}));
 async function health(){try{const d=await api("/api/health");engineReady=!!d.ollama;if(!engineReady)toast("Creator unavailable","The content engine is not ready yet.",8000)}catch{engineReady=false;toast("Connection unavailable","Please start the BrightBook service and try again.",8000)}finally{$("#generate").disabled=false}}
 function settings(){
-  const theme=$("#theme").value,activityType=$("#activityType").value,genreType=$("#genreType").value;
+  const activityType=$("#activityType").value,genreType=$("#genreType").value;
   const mazeLayout=activityType==="maze"?genreType:"";
   const wordSearchMode=activityType==="word-search"?genreType:"";
   const effectiveGenre=effectiveGenreForActivity(activityType,genreType);
   const bookIdea=$("#bookIdea")?.value.trim()||"";
+  const isCustomIdea=$("#detectedThemeName")?.textContent==="Custom Idea";
+  const theme=isCustomIdea?"Custom Idea":$("#theme").value;
+  const topic=isCustomIdea&&bookIdea?bookIdea:theme;
   const customDirection=$("#customDirection")?.disabled?"":($("#customDirection")?.value.trim()||"");
   const avoidTerms=$("#avoidTerms")?.disabled?"":($("#avoidTerms")?.value.trim()||"");
-  return{topic:theme,theme,bookIdea,customDirection,avoidTerms,activityType,activityTypes:[activityType],age:$("#age").value,language:$("#language").value,pageCount:Number($("#pageCount").value),genreType:effectiveGenre,difficulty:effectiveGenre,displayGenre:genreType,mazeLayout,wordSearchMode,size:"A4",style:styleFromGenre(effectiveGenre),learningGoal:"",guideCharacter:""};
+  return{topic,theme,bookIdea,customDirection,avoidTerms,activityType,activityTypes:[activityType],age:$("#age").value,language:$("#language").value,pageCount:Number($("#pageCount").value),genreType:effectiveGenre,difficulty:effectiveGenre,displayGenre:genreType,mazeLayout,wordSearchMode,size:"A4",style:styleFromGenre(effectiveGenre),learningGoal:"",guideCharacter:""};
 }
 function normalizeSelections(){
   applyFeatureGates();
