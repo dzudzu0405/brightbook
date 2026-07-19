@@ -65,6 +65,13 @@
           <section class="builder">
             <div class="section-title"><span>01</span><div><small>BOOK SETUP</small><h3>Set Up Your Book</h3></div></div>
 
+            <div class="grid one">
+              <label><span>Book Idea</span>
+                <input id="bookIdea" maxlength="180" placeholder="Example: cute farm animal coloring book for preschool kids">
+                <small class="field-help">Describe the book. BrightBook will detect the best theme automatically.</small>
+              </label>
+            </div>
+
             <div class="grid two primary-selects">
               <label><span>Activity Type</span>
                 <select id="activityType">
@@ -82,8 +89,11 @@
                 </select>
                 <small class="field-help">Choose one product format</small>
               </label>
-              <label><span>Theme</span>
-                <select id="theme">
+              <div class="detected-theme-card">
+                <span>Detected Theme</span>
+                <strong id="detectedThemeName">Ocean Animals</strong>
+                <small id="detectedThemeHelp">Type a book idea and BrightBook will match it to the closest available theme.</small>
+                <select id="theme" class="hidden" aria-hidden="true" tabindex="-1">
                   <optgroup label="Animals">
                     <option>Ocean Animals</option><option>Farm Animals</option><option>Safari Animals</option><option>Woodland Animals</option><option>Rainforest Animals</option><option>Arctic Animals</option><option>Dinosaurs</option><option>Insects & Butterflies</option><option>Birds</option><option>Pets</option>
                   </optgroup>
@@ -100,8 +110,7 @@
                     <option>Unicorns & Rainbows</option><option>Dragons & Castles</option><option>Fairies & Magical Forests</option><option>Pirates</option><option>Robots</option><option>Cars & Trucks</option><option>Trains</option><option>Airplanes</option><option>Christmas</option><option>Halloween</option>
                   </optgroup>
                 </select>
-                <small class="field-help">50 ready-to-use themes</small>
-              </label>
+              </div>
             </div>
 
             <div class="grid two">
@@ -142,13 +151,6 @@
               </label>
             </div>
 
-            <div class="grid one">
-              <label><span>Book Idea</span>
-                <input id="bookIdea" maxlength="180" placeholder="Example: cute farm animal coloring book for preschool kids">
-                <small class="field-help">Optional, but helps BrightBook shape the kit around your niche.</small>
-              </label>
-            </div>
-
             <details id="advancedInputs">
               <summary>Advanced direction <small>Optional OTO-style controls</small></summary>
               <div class="advanced">
@@ -171,7 +173,7 @@
             <div class="empty-preview" id="emptyPreview">
               <div class="book-icon">✦</div>
               <h3>Your product kit will appear here</h3>
-              <p>Choose a product type and theme, then generate a complete 25-30 page publishing kit.</p>
+              <p>Enter a book idea, let BrightBook detect the theme, then generate a complete 25-30 page publishing kit.</p>
               <div class="flow"><span>Your Idea</span><i>→</i><span>BrightBook</span><i>→</i><span>Product Kit</span></div>
             </div>
 

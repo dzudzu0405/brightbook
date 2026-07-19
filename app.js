@@ -16,11 +16,98 @@ const THEME_GROUP_FALLBACK=$$("#theme option").map(o=>({
   featureKey:`theme.${(o.value||o.textContent).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"")}`,
   compatibleActivityTypes:initialActivities.map(a=>a.value)
 }));
+const THEME_ALIASES={
+  "Ocean Animals":["ocean","sea","marine","underwater","dolphin","turtle","whale","shark","fish","coral"],
+  "Farm Animals":["farm","barn","cow","sheep","pig","chicken","horse","duck","goat","rooster","calf","lamb"],
+  "Safari Animals":["safari","lion","elephant","giraffe","zebra","rhino","hippo","savanna"],
+  "Woodland Animals":["woodland","forest animal","fox","deer","bear","rabbit","squirrel","raccoon"],
+  "Rainforest Animals":["rainforest","jungle","monkey","parrot","jaguar","toucan","tropical"],
+  "Arctic Animals":["arctic","polar","penguin","seal","walrus","snow animal"],
+  "Dinosaurs":["dinosaur","dino","t rex","triceratops","stegosaurus"],
+  "Insects & Butterflies":["insect","bug","butterfly","bee","ladybug","dragonfly"],
+  "Birds":["bird","owl","eagle","parrot","sparrow"],
+  "Pets":["pet","dog","cat","puppy","kitten","hamster","goldfish"],
+  "Community Helpers":["community helper","helper","mail carrier","librarian","worker"],
+  "Doctors & Nurses":["doctor","nurse","hospital","clinic","medical"],
+  "Firefighters":["firefighter","fire truck","fire station"],
+  "Police Officers":["police","officer","safety patrol"],
+  "Teachers & School":["teacher","school","classroom","student"],
+  "Construction Workers":["construction","builder","crane","bulldozer"],
+  "Farmers":["farmer","farming","tractor","harvest"],
+  "Chefs & Bakers":["chef","baker","bakery","cooking"],
+  "Scientists":["scientist","science lab","experiment","microscope"],
+  "Astronauts":["astronaut","space suit","moon explorer"],
+  "Outer Space":["outer space","space","rocket","alien","galaxy"],
+  "Solar System":["solar system","planet","sun","moon","orbit"],
+  "Weather":["weather","rain","storm","cloud","wind","snow"],
+  "Seasons":["season","spring","summer","fall","autumn","winter"],
+  "Human Body":["human body","body","skeleton","heart","brain"],
+  "Plants & Gardens":["plant","garden","flower","seed","tree"],
+  "Volcanoes":["volcano","lava","eruption"],
+  "Oceans & Coral Reefs":["coral reef","reef","coral","ocean reef"],
+  "Camping Adventure":["camping","campfire","tent","hiking"],
+  "Treasure Hunt":["treasure","pirate map","hidden treasure"],
+  "Alphabet":["alphabet","letter","abc"],
+  "Numbers 1-20":["number","numbers","count 1 20","1-20"],
+  "Shapes":["shape","circle","square","triangle"],
+  "Colors":["color","colors","rainbow color"],
+  "Opposites":["opposite","big and small","hot and cold"],
+  "Healthy Habits":["healthy habit","brush teeth","exercise","hygiene"],
+  "Emotions & Feelings":["emotion","feeling","happy","sad","angry"],
+  "Friendship & Kindness":["friendship","kindness","sharing","friend"],
+  "Safety Rules":["safety","rules","crosswalk","helmet"],
+  "Daily Routines":["daily routine","morning routine","bedtime"],
+  "Unicorns & Rainbows":["unicorn","rainbow"],
+  "Dragons & Castles":["dragon","castle","knight"],
+  "Fairies & Magical Forests":["fairy","magical forest","magic forest"],
+  "Pirates":["pirate","ship","captain"],
+  "Robots":["robot","machine"],
+  "Cars & Trucks":["car","truck","vehicle","monster truck"],
+  "Trains":["train","railway","locomotive"],
+  "Airplanes":["airplane","plane","airport"],
+  "Christmas":["christmas","santa","reindeer"],
+  "Halloween":["halloween","pumpkin","ghost","witch"]
+};
 function userToken(){const qs=new URLSearchParams(location.search);const t=qs.get("token");if(t){localStorage.setItem("brightbookUserToken",t);return t}return localStorage.getItem("brightbookUserToken")||"demo-token"}
 async function api(path,options={}){const r=await fetch(path,{...options,headers:{"Content-Type":"application/json","x-user-token":userToken(),...(options.headers||{})}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Something went wrong.");return d}
 function hasFeature(key){return accountFeatures.has(key)}
 function themeInfo(name){return catalog.themes.find(t=>t.name===name)}
 function genreInfo(name){return catalog.genres?.find(g=>g.name===name)}
+function normText(value=""){return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim()}
+function allowedThemesFor(activity,genre){
+  const hasLoadedFeatures=accountFeatures.size>0;
+  const g=genreInfo(genre);
+  const allThemes=catalog.themes?.length?catalog.themes:THEME_GROUP_FALLBACK;
+  return allThemes.filter(t=>{
+    const allowedByPlan=hasFeature(t.featureKey);
+    const activityCompatible=t.compatibleActivityTypes.includes(activity);
+    const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
+    return (allowedByPlan||!hasLoadedFeatures)&&activityCompatible&&genreCompatible;
+  });
+}
+function detectThemeFromIdea(idea,themes){
+  const text=normText(idea);
+  if(!themes.length)return "";
+  if(!text)return themes.find(t=>t.name===$("#theme").value)?.name||themes[0].name;
+  const scored=themes.map(t=>{
+    const name=normText(t.name);
+    const tokens=name.split(" ").filter(token=>token.length>2);
+    let score=text.includes(name)?12:0;
+    for(const token of tokens)if(text.includes(token))score+=2;
+    for(const alias of THEME_ALIASES[t.name]||[]){
+      const normalized=normText(alias);
+      if(text.includes(normalized))score+=normalized.includes(" ")?8:5;
+    }
+    return {theme:t.name,score};
+  }).sort((a,b)=>b.score-a.score);
+  return scored[0]?.score>0?scored[0].theme:(themes.find(t=>t.name===$("#theme").value)?.name||themes[0].name);
+}
+function updateDetectedTheme(theme,source=""){
+  $("#detectedThemeName").textContent=theme||"Waiting for idea";
+  $("#detectedThemeHelp").textContent=source==="idea"
+    ? "Matched from your book idea. BrightBook will keep every prompt anchored to this theme."
+    : "Type a book idea and BrightBook will match it to the closest available theme.";
+}
 function styleFromGenre(genreType){
   const map={
     "Classic Educational":"clean modern educational workbook illustration",
@@ -81,16 +168,12 @@ function applyFeatureGates(){
   setPlainOptions($("#genreType"),genres.map(value=>({value,label:value})),previous.genre);
 
   let genre=$("#genreType").value;
-  let g=genreInfo(genre);
-  let allThemes=catalog.themes?.length?catalog.themes:THEME_GROUP_FALLBACK;
-  let themes=allThemes.filter(t=>{
-    const allowedByPlan=hasFeature(t.featureKey);
-    const activityCompatible=t.compatibleActivityTypes.includes(activity);
-    const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return (allowedByPlan||!hasLoadedFeatures)&&activityCompatible&&genreCompatible;
-  });
-  if(!themes.length&&!hasLoadedFeatures)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
+  let themes=allowedThemesFor(activity,genre);
+  if(!themes.length&&!hasLoadedFeatures)themes=THEME_GROUP_FALLBACK.filter(t=>t.compatibleActivityTypes.includes(activity));
   setThemeOptions(themes,previous.theme);
+  const detectedTheme=detectThemeFromIdea($("#bookIdea")?.value||"",themes);
+  if(detectedTheme)$("#theme").value=detectedTheme;
+  updateDetectedTheme($("#theme").value,$("#bookIdea")?.value.trim()?"idea":"default");
 
   let theme=$("#theme").value;
   genres=initialGenres.filter(name=>{
@@ -100,7 +183,7 @@ function applyFeatureGates(){
   setPlainOptions($("#genreType"),genres.map(value=>({value,label:value})),genre);
 
   genre=$("#genreType").value;
-  g=genreInfo(genre);
+  let g=genreInfo(genre);
   const finalActivities=planActivities.filter(a=>{
     const t=themeInfo(theme);
     const activityThemeCompatible=t ? t.compatibleActivityTypes.includes(a.value) : true;
@@ -109,15 +192,12 @@ function applyFeatureGates(){
   });
   setPlainOptions($("#activityType"),finalActivities.length?finalActivities:planActivities,$("#activityType").value);
   activity=$("#activityType").value;
-  allThemes=catalog.themes?.length?catalog.themes:THEME_GROUP_FALLBACK;
-  themes=allThemes.filter(t=>{
-    const allowedByPlan=hasFeature(t.featureKey);
-    const activityCompatible=t.compatibleActivityTypes.includes(activity);
-    const genreCompatible=g ? g.compatibleThemes.includes(t.name) : true;
-    return (allowedByPlan||!hasLoadedFeatures)&&activityCompatible&&genreCompatible;
-  });
-  if(!themes.length&&!hasLoadedFeatures)themes=allThemes.filter(t=>t.compatibleActivityTypes.includes(activity)&&(g?g.compatibleThemes.includes(t.name):true));
+  themes=allowedThemesFor(activity,genre);
+  if(!themes.length&&!hasLoadedFeatures)themes=THEME_GROUP_FALLBACK.filter(t=>t.compatibleActivityTypes.includes(activity));
   setThemeOptions(themes,$("#theme").value);
+  const finalDetectedTheme=detectThemeFromIdea($("#bookIdea")?.value||"",themes);
+  if(finalDetectedTheme)$("#theme").value=finalDetectedTheme;
+  updateDetectedTheme($("#theme").value,$("#bookIdea")?.value.trim()?"idea":"default");
 
   const pageCountsByFeature=initialPageCounts.filter(value=>hasFeature(`quantity.${value}`)).map(value=>({value,label:value}));
   const pageCounts=hasLoadedFeatures?pageCountsByFeature:initialPageCounts.map(value=>({value,label:value}));
@@ -142,12 +222,12 @@ function toast(title,msg="",duration=3000){const t=$("#toast");t.querySelector("
 function showView(name){Object.values(views).forEach(v=>v.classList.remove("active"));views[name].classList.add("active");$("#pageTitle").textContent=titles[name];$$("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));$(".sidebar").classList.remove("open");if(name==="projects")loadProjects();window.scrollTo({top:0,behavior:"smooth"})}
 $$("nav button").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));$(".menu").addEventListener("click",()=>$(".sidebar").classList.toggle("open"));$("#newBook").addEventListener("click",()=>{reset();showView("creator")});
 $("#activityType").addEventListener("change",applyFeatureGates);
-$("#theme").addEventListener("change",applyFeatureGates);
 $("#genreType").addEventListener("change",applyFeatureGates);
+$("#bookIdea")?.addEventListener("input",applyFeatureGates);
 $("#accountButton")?.addEventListener("click",e=>{e.stopPropagation();$("#accountMenu")?.classList.toggle("hidden")});
 document.addEventListener("click",e=>{if(!e.target.closest?.("#accountDock"))$("#accountMenu")?.classList.add("hidden")});
 $("#copyAccountToken")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
-$$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#theme").value=b.dataset.theme;showView("creator");applyFeatureGates()}));
+$$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#bookIdea").value=`${b.dataset.theme}: ${b.dataset.template}`;showView("creator");applyFeatureGates()}));
 async function health(){try{const d=await api("/api/health");engineReady=!!d.ollama;if(!engineReady)toast("Creator unavailable","The content engine is not ready yet.",8000)}catch{engineReady=false;toast("Connection unavailable","Please start the BrightBook service and try again.",8000)}finally{$("#generate").disabled=false}}
 function settings(){
   const theme=$("#theme").value,activityType=$("#activityType").value,genreType=$("#genreType").value;

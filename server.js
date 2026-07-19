@@ -78,6 +78,52 @@ const THEME_GROUPS=[
   ["Learning & Everyday Life",["Alphabet","Numbers 1–20","Shapes","Colors","Opposites","Healthy Habits","Emotions & Feelings","Friendship & Kindness","Safety Rules","Daily Routines"]],
   ["Fantasy, Holidays & Transport",["Unicorns & Rainbows","Dragons & Castles","Fairies & Magical Forests","Pirates","Robots","Cars & Trucks","Trains","Airplanes","Christmas","Halloween"]]
 ];
+const THEME_ALIASES={
+  "Ocean Animals":["ocean","sea","marine","underwater","dolphin","turtle","whale","shark","fish","coral"],
+  "Farm Animals":["farm","barn","cow","sheep","pig","chicken","horse","duck","goat","rooster","calf","lamb"],
+  "Safari Animals":["safari","lion","elephant","giraffe","zebra","rhino","hippo","savanna"],
+  "Woodland Animals":["woodland","forest animal","fox","deer","bear","rabbit","squirrel","raccoon"],
+  "Rainforest Animals":["rainforest","jungle","monkey","parrot","jaguar","toucan","tropical"],
+  "Arctic Animals":["arctic","polar","penguin","seal","walrus","snow animal"],
+  "Dinosaurs":["dinosaur","dino","t rex","triceratops","stegosaurus"],
+  "Insects & Butterflies":["insect","bug","butterfly","bee","ladybug","dragonfly"],
+  "Pets":["pet","dog","cat","puppy","kitten","hamster"],
+  "Doctors & Nurses":["doctor","nurse","hospital","clinic","medical"],
+  "Firefighters":["firefighter","fire truck","fire station"],
+  "Police Officers":["police","officer"],
+  "Teachers & School":["teacher","school","classroom","student"],
+  "Construction Workers":["construction","builder","crane","bulldozer"],
+  "Farmers":["farmer","farming","tractor","harvest"],
+  "Chefs & Bakers":["chef","baker","bakery","cooking"],
+  "Scientists":["scientist","science lab","experiment","microscope"],
+  "Astronauts":["astronaut","space suit","moon explorer"],
+  "Outer Space":["outer space","space","rocket","alien","galaxy"],
+  "Solar System":["solar system","planet","sun","moon","orbit"],
+  "Weather":["weather","rain","storm","cloud","wind","snow"],
+  "Plants & Gardens":["plant","garden","flower","seed","tree"],
+  "Volcanoes":["volcano","lava","eruption"],
+  "Oceans & Coral Reefs":["coral reef","reef","coral","ocean reef"],
+  "Camping Adventure":["camping","campfire","tent","hiking"],
+  "Treasure Hunt":["treasure","hidden treasure"],
+  "Alphabet":["alphabet","letter","abc"],
+  "Shapes":["shape","circle","square","triangle"],
+  "Colors":["color","colors","rainbow color"],
+  "Healthy Habits":["healthy habit","brush teeth","exercise","hygiene"],
+  "Emotions & Feelings":["emotion","feeling","happy","sad","angry"],
+  "Friendship & Kindness":["friendship","kindness","sharing","friend"],
+  "Safety Rules":["safety","rules","crosswalk","helmet"],
+  "Daily Routines":["daily routine","morning routine","bedtime"],
+  "Unicorns & Rainbows":["unicorn","rainbow"],
+  "Dragons & Castles":["dragon","castle","knight"],
+  "Fairies & Magical Forests":["fairy","magical forest","magic forest"],
+  "Pirates":["pirate","ship","captain"],
+  "Robots":["robot","machine"],
+  "Cars & Trucks":["car","truck","vehicle","monster truck"],
+  "Trains":["train","railway","locomotive"],
+  "Airplanes":["airplane","plane","airport"],
+  "Christmas":["christmas","santa","reindeer"],
+  "Halloween":["halloween","pumpkin","ghost","witch"]
+};
 const ACTIVITY_TYPES=["word-search","coloring","educational-story","maze","tracing","matching","counting","simple-math","spot-difference","puzzle","learning-worksheet"];
 const GENRE_TYPES=[
   "Classic Educational",
@@ -93,6 +139,31 @@ const GENRE_TYPES=[
 ];
 function featureSlug(value=""){
   return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+}
+function normText(value=""){
+  return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim();
+}
+function detectThemeFromIdea(idea,activityType="",genreType=""){
+  const text=normText(idea);
+  if(!text)return "";
+  const genreThemes=genreType&&GENRE_TYPES.includes(genreType)?new Set(compatibleThemesForGenre(genreType)):null;
+  const candidates=THEME_GROUPS.flatMap(([,items])=>items).filter(theme=>{
+    const activityOk=!activityType||compatibleActivityTypes(theme).includes(activityType);
+    const genreOk=!genreThemes||genreThemes.has(theme);
+    return activityOk&&genreOk;
+  });
+  const scored=candidates.map(theme=>{
+    const name=normText(theme);
+    const tokens=name.split(" ").filter(token=>token.length>2);
+    let score=text.includes(name)?12:0;
+    for(const token of tokens)if(text.includes(token))score+=2;
+    for(const alias of THEME_ALIASES[theme]||[]){
+      const normalized=normText(alias);
+      if(text.includes(normalized))score+=normalized.includes(" ")?8:5;
+    }
+    return {theme,score};
+  }).sort((a,b)=>b.score-a.score);
+  return scored[0]?.score>0?scored[0].theme:"";
 }
 function themeFeatureKey(theme){return `theme.${featureSlug(theme)}`}
 function themeCategory(theme){
@@ -834,17 +905,24 @@ function promptSignature(page={}){
   return normalizeTitle(`${page.title} ${page.instruction} ${(page.content_items||[]).join(" ")}`);
 }
 function validate(input){
-  if(!input.topic||input.topic.length<3)throw new Error("Please select a theme.");
   if(!input.activityType)input.activityType=Array.isArray(input.activityTypes)?input.activityTypes[0]:"";
   if(!input.activityType)throw new Error("Please select an activity type.");
-  if(!input.theme)throw new Error("Please select a theme.");
-  if(!isCompatible(input.activityType,input.theme))throw new Error(`The selected theme is not a good fit for ${input.activityType}. Please choose another theme.`);
   input.genreType=String(input.genreType||input.difficulty||"Classic Educational").trim();
   if(!GENRE_TYPES.includes(input.genreType))throw new Error("Please select a valid type / genre.");
+  input.bookIdea=String(input.bookIdea||"").replace(/\s+/g," ").trim().slice(0,180);
+  const detectedTheme=detectThemeFromIdea(input.bookIdea,input.activityType,input.genreType);
+  if(detectedTheme){
+    input.theme=detectedTheme;
+    input.topic=detectedTheme;
+  }
+  if(!input.theme)input.theme=String(input.topic||"").trim();
+  if(!input.topic)input.topic=input.theme;
+  if(!input.topic||input.topic.length<3)throw new Error("Please enter a book idea so BrightBook can detect a theme.");
+  if(!input.theme)throw new Error("BrightBook could not detect a theme from your book idea.");
+  if(!isCompatible(input.activityType,input.theme))throw new Error(`The detected theme is not a good fit for ${input.activityType}. Please adjust your book idea.`);
   if(!isGenreCompatible(input.activityType,input.theme,input.genreType))throw new Error(`The selected type / genre is not a good fit for ${input.activityType} with ${input.theme}. Please choose another combination.`);
   input.difficulty=input.genreType;
   input.style=String(input.style||styleFromGenre(input.genreType)).trim();
-  input.bookIdea=String(input.bookIdea||"").replace(/\s+/g," ").trim().slice(0,180);
   input.customDirection=String(input.customDirection||"").replace(/\s+/g," ").trim().slice(0,500);
   input.avoidTerms=String(input.avoidTerms||"").replace(/\s+/g," ").trim().slice(0,350);
   input.learningGoal=String(input.learningGoal||"").replace(/\s+/g," ").trim().slice(0,240);
