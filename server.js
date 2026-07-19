@@ -888,29 +888,58 @@ function lockCoverPrompt(prompt,input){
     : "rich professional color palette matched to the selected genre";
   return `Create a premium full-color children's book cover, vertical 2:3 composition.\n\nScene: ${scene}.\n\nCover design: clear central focal character or object, strong readable silhouette, polished publishing layout, title-safe space in the upper-middle, subtitle-safe space below the title, author-name safe space at the bottom, balanced foreground and background, ornate but readable framing, rich theme-specific props and decorative details, ${c.themeDirection}.\n\nColor and mood: ${palette}, cinematic lighting where appropriate, soft depth, magical but child-friendly atmosphere, professional illustrated book cover finish.\n\nStyle: ${input.style}, consistent child-friendly visual language, premium cover art, high-resolution, no cropped important objects.\n\nNegative prompt: no watermark, no logo, no brand characters, no photorealism, no 3D render, no malformed anatomy, no cluttered typography, no illegible random text.`;
 }
+function titleCase(text=""){
+  return String(text).toLowerCase().replace(/\b\w/g,char=>char.toUpperCase()).replace(/\s+/g," ").trim();
+}
+function listingNiche(input){
+  const idea=String(input.bookIdea||"").replace(/^(a|an|the)\s+/i,"").replace(/\s+/g," ").trim();
+  const theme=input.theme==="Custom Idea" ? String(input.topic||"Activity").trim() : String(input.theme||input.topic||"Activity").trim();
+  return titleCase(idea||theme||"Activity");
+}
+function activityBookLabel(type){
+  return ({
+    "coloring":"Coloring Book",
+    "word-search":"Word Search Book",
+    "tracing":"Tracing Practice Book",
+    "matching":"Matching Activity Book",
+    "counting":"Number Practice Book",
+    "learning-worksheet":"Activity Worksheet Pack"
+  })[type]||"Activity Book";
+}
+function ageLabel(age=""){
+  const match=String(age).match(/\d+\s*[–-]\s*\d+/);
+  return match?`Ages ${match[0].replace(/\s+/g,"")}`:String(age||"Kids").replace(/\byears?\b/i,"").trim();
+}
 function ensurePublishingKit(book,input){
-  const title=String(book.book_title||`${input.theme} Activity Book`).slice(0,70);
-  const subtitle=String(book.subtitle||`${input.activityType} pages for ${input.age}`).slice(0,120);
   const theme=String(input.theme||input.topic||"Activity Book");
   const activity=String(input.activityType||"activity").replace(/-/g," ");
+  const niche=listingNiche(input);
+  const activityLabel=activityBookLabel(input.activityType);
+  const age=ageLabel(input.age);
+  const title=String(book.book_title||`${niche} ${activityLabel}`).replace(/\s+Kit$/i,"").slice(0,70);
+  const subtitle=String(book.subtitle||`${activityLabel} pages for ${input.age}`).replace(/\s+kit\b/ig,"").slice(0,120);
+  const kdpTitle=`${niche} ${activityLabel} for Kids ${age}`.replace(/\s+/g," ").slice(0,180);
+  const kdpSubtitle=`Fun ${theme} activity pages for ${input.age} with clear prompts, answer guidance, and publishing-ready planning`.slice(0,200);
   const keywords=(Array.isArray(book.keywords)&&book.keywords.length?book.keywords:[theme,`${theme} activity book`,`${activity} book`,`${input.age} activities`]).slice(0,8);
-  if(!book.listing_assets){
-    book.listing_assets={
-      kdp_title:title,
-      kdp_subtitle:subtitle,
-      kdp_description:`${title} is a printable ${activity} product kit for ${input.age}. It includes themed page concepts, clear instructions, answer guidance where needed, and cover direction to help sellers prepare a polished activity book for KDP, Etsy, Gumroad, or classroom marketplaces. Review the pages, create the final artwork, verify print settings, and customize the listing before publishing.`,
-      backend_keywords:Array.from({length:7},(_,i)=>keywords[i]||`${theme} printable activity ${i+1}`),
-      etsy_title:`${title} Printable Activity Book, ${theme} ${activity} Pages, Kids Workbook PDF`,
-      etsy_tags:[theme,"activity book","printable kids","kids worksheet","kdp interior","etsy printable",activity,"homeschool","classroom","coloring pages","busy book","learning fun","digital download"].slice(0,13),
-      short_blurb:`A ${theme} ${activity} kit with page prompts, answer keys, cover direction, and launch-ready marketplace assets.`,
-      a_plus_sections:[
-        `Show the ${theme} theme and age range at a glance.`,
-        "Highlight sample interior pages and the learning benefits.",
-        "Explain what buyers receive and how the printable can be used.",
-        "Show bundle or series options for repeat buyers."
-      ]
-    };
-  }
+  if(/\bkit$/i.test(String(book.book_title||"")))book.book_title=title;
+  const listingDefaults={
+    kdp_title:kdpTitle,
+    kdp_subtitle:kdpSubtitle,
+    kdp_description:`${kdpTitle} is a themed ${activityLabel.toLowerCase()} for ${input.age}. It includes structured page ideas, clear instructions, answer guidance where needed, cover direction, keywords, and launch planning notes to help sellers prepare a polished activity book for KDP, Etsy, Gumroad, or classroom marketplaces. Review the pages, create the final artwork, verify print settings, and customize the listing before publishing.`,
+    backend_keywords:Array.from({length:7},(_,i)=>keywords[i]||`${theme} printable activity ${i+1}`),
+    etsy_title:`${niche} ${activityLabel} Printable, ${theme} Kids Workbook Pages, Activity Book PDF`,
+    etsy_tags:[theme,"activity book","printable kids","kids worksheet","kdp interior","etsy printable",activity,"homeschool","classroom","coloring pages","busy book","learning fun","digital download"].slice(0,13),
+    short_blurb:`A ${theme} ${activity} kit with page prompts, answer keys, cover direction, and launch-ready marketplace assets.`,
+    a_plus_sections:[
+      `Show the ${theme} theme and age range at a glance.`,
+      "Highlight sample interior pages and the learning benefits.",
+      "Explain what buyers receive and how the printable can be used.",
+      "Show bundle or series options for repeat buyers."
+    ]
+  };
+  book.listing_assets={...listingDefaults,...(book.listing_assets||{}),kdp_title:kdpTitle,kdp_subtitle:kdpSubtitle};
+  if(/\bkit\b/i.test(String(book.listing_assets.kdp_description||"")))book.listing_assets.kdp_description=listingDefaults.kdp_description;
+  if(/\bkit\b/i.test(String(book.listing_assets.etsy_title||"")))book.listing_assets.etsy_title=listingDefaults.etsy_title;
   if(!book.quality_check){
     const warnings=[];
     if(!book.cover_prompt)warnings.push("Add or review the cover prompt before publishing.");
