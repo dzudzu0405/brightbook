@@ -61,13 +61,15 @@ If the user idea is vague, the app may use a reasonable default, but it should c
 
 ## Supported Activity Types For Main Product
 
-The initial focused product should prioritize these 5 activity types:
+The focused MVP product should prioritize these 7 activity types:
 
 1. Word Search Book
 2. Coloring Book
 3. Maze Book
 4. Tracing & Handwriting Book
-5. Educational Worksheet Pack
+5. Matching Activity Book
+6. Counting Book
+7. Educational Worksheet Pack
 
 These are the safest and most commercially understandable activity types for KDP/Etsy buyers.
 
@@ -185,7 +187,31 @@ Quality rule:
 
 Letters and dotted tracing content should be generated as layout/text data, not baked into AI artwork.
 
-### 5. Educational Worksheet Pack
+### 5. Matching Activity Book
+
+User expectation:
+
+I want simple matching worksheets with exact pairs and an answer key.
+
+Output requirements:
+
+- Each page must define the left column, right column display order, and correct pairs.
+- The answer key must repeat every correct match.
+- Image prompt should create a worksheet frame with blank columns and open space for connecting lines.
+
+### 6. Counting Book
+
+User expectation:
+
+I want counting pages with exact quantities, not vague image prompts.
+
+Output requirements:
+
+- Each page must define the object to count and exact quantity.
+- The image prompt must ask for exactly that number of visible objects.
+- The answer key must give the exact number.
+
+### 7. Educational Worksheet Pack
 
 User expectation:
 
@@ -276,10 +302,10 @@ BrightBook should support low-to-high one-time packages, not only one flat featu
 The model should be:
 
 ```text
-Low-ticket Front-End + OTO upgrades
+Low-ticket Starter + Pro OTO + Publisher OTO
 ```
 
-### Plan 1: Starter / Front-End
+### Plan 1: Starter
 
 Goal:
 
@@ -298,7 +324,7 @@ Suggested access:
 
 This plan should feel valuable, but it should not unlock every workflow.
 
-### Plan 2: Activity Expansion OTO
+### Plan 2: Pro
 
 Goal:
 
@@ -308,13 +334,14 @@ Suggested access:
 
 - Maze Book
 - Tracing & Handwriting Book
-- Educational Worksheet Pack
+- Matching Activity Book
+- Counting Book
 - More themes
 - 30 pages per generation
-- Save projects
+- Advanced direction
 - More structured answer keys
 
-### Plan 3: Publishing Kit OTO
+### Plan 3: Publisher
 
 Goal:
 
@@ -323,6 +350,8 @@ Help users prepare products for marketplace listing.
 Suggested access:
 
 - Listing kit
+- Educational Worksheet Pack
+- Save projects
 - KDP metadata
 - Etsy title and tags
 - Backend keywords
@@ -331,23 +360,8 @@ Suggested access:
 - Fix suggestions
 - Series ideas
 - Launch checklist
-
-### Plan 4: Pro / Agency License
-
-Goal:
-
-Unlock everything for power users and service providers.
-
-Suggested access:
-
-- All activity types
 - All themes
-- Advanced direction
-- Exclude / Avoid input
-- Save projects
 - Full exports
-- Larger generation history
-- Agency/commercial usage positioning
 
 ## Feature Gate Requirements
 
@@ -360,6 +374,8 @@ activity.coloring
 activity.word-search
 activity.maze
 activity.tracing
+activity.matching
+activity.counting
 activity.learning-worksheet
 quantity.25
 quantity.30

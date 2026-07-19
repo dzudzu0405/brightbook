@@ -8,7 +8,7 @@ let catalog={themes:[],activities:[]};
 let engineReady=null;
 const views={creator:$("#creatorView"),projects:$("#projectsView"),templates:$("#templatesView")};
 const titles={creator:"Activity Book Product Kit Creator",projects:"Saved Projects",templates:"Template Library"};
-const typeNames={"word-search":"Word Search","coloring":"Coloring","educational-story":"Educational Story","maze":"Maze","tracing":"Tracing & Handwriting","matching":"Matching","counting":"Counting","simple-math":"Math Practice","spot-difference":"Spot the Difference","puzzle":"Children's Puzzle","learning-worksheet":"Educational Worksheet"};
+const typeNames={"word-search":"Word Search","coloring":"Coloring","maze":"Maze","tracing":"Tracing & Handwriting","matching":"Matching","counting":"Counting","learning-worksheet":"Educational Worksheet"};
 const initialActivities=$$("#activityType option").map(o=>({value:o.value,label:o.textContent}));
 const initialGenres=$$("#genreType option").map(o=>o.value);
 const initialPageCounts=$$("#pageCount option").map(o=>o.value);
@@ -280,6 +280,11 @@ $("#bookIdea")?.addEventListener("input",applyFeatureGates);
 $("#accountButton")?.addEventListener("click",e=>{e.stopPropagation();$("#accountMenu")?.classList.toggle("hidden")});
 document.addEventListener("click",e=>{if(!e.target.closest?.("#accountDock"))$("#accountMenu")?.classList.add("hidden")});
 $("#copyAccountToken")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
+$("#copyAccountTokenSide")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
+$("#sidebarSearch")?.addEventListener("input",e=>{
+  const text=normText(e.target.value);
+  $$("nav button").forEach(button=>button.classList.toggle("hidden",text&&!normText(button.textContent).includes(text)));
+});
 $$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#bookIdea").value=`${b.dataset.theme}: ${b.dataset.template}`;showView("creator");applyFeatureGates()}));
 async function health(){try{const d=await api("/api/health");engineReady=!!d.ollama;if(!engineReady)toast("Creator unavailable","The content engine is not ready yet.",8000)}catch{engineReady=false;toast("Connection unavailable","Please start the BrightBook service and try again.",8000)}finally{$("#generate").disabled=false}}
 function settings(){

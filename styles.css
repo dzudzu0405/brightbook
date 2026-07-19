@@ -82,6 +82,50 @@ body:not(.landing-body):not(.admin-body){
   background:rgba(255,255,255,.11);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
 }
+.side-search{
+  position:relative;display:block;margin:0 0 18px;padding:0;
+}
+.side-search span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.side-search input{
+  width:100%;padding:11px 40px 11px 34px;border-radius:14px;
+  color:#dbeafe;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);
+  font-size:13px;
+}
+.side-search:before{
+  content:"";position:absolute;left:13px;top:50%;width:11px;height:11px;
+  border:2px solid rgba(219,234,254,.62);border-radius:50%;transform:translateY(-55%);
+}
+.side-search:after{
+  content:"";position:absolute;left:24px;top:25px;width:6px;height:2px;
+  background:rgba(219,234,254,.62);transform:rotate(45deg);border-radius:999px;
+}
+.side-search kbd{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  padding:2px 6px;border-radius:7px;color:#c7d2fe;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.12);font-size:10px;font-family:inherit;
+}
+.side-label{
+  display:block;margin:18px 9px 8px;color:#7fa39b;
+  font-size:10px;font-weight:900;letter-spacing:1.2px;text-transform:uppercase;
+}
+.side-tools{display:grid;gap:7px}
+.side-tools a,.side-tools button{
+  display:block;width:100%;padding:11px 14px;border:0;border-radius:13px;
+  color:#bdd4d0;background:transparent;text-align:left;text-decoration:none;
+  cursor:pointer;font-size:13px;font-weight:750;
+}
+.side-tools a:hover,.side-tools button:hover{background:rgba(255,255,255,.09);color:#fff}
+.upgrade-list{display:grid;gap:8px}
+.upgrade-list span{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 12px;color:#d9fff0;background:rgba(167,243,208,.09);
+  border:1px solid rgba(167,243,208,.12);border-radius:14px;font-size:13px;font-weight:800;
+}
+.upgrade-list b{
+  display:grid;place-items:center;width:21px;height:21px;border-radius:8px;
+  color:#06382f;background:#a7f3d0;font-size:13px;
+}
 main{
   margin-left:280px;
   background:

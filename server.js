@@ -124,7 +124,7 @@ const THEME_ALIASES={
   "Christmas":["christmas","santa","reindeer"],
   "Halloween":["halloween","pumpkin","ghost","witch"]
 };
-const ACTIVITY_TYPES=["word-search","coloring","educational-story","maze","tracing","matching","counting","simple-math","spot-difference","puzzle","learning-worksheet"];
+const ACTIVITY_TYPES=["word-search","coloring","maze","tracing","matching","counting","learning-worksheet"];
 const GENRE_TYPES=[
   "Classic Educational",
   "Cinematic Adventure",
@@ -190,10 +190,10 @@ function compatibleActivityTypes(theme){
   const t=String(theme).toLowerCase();
   let allowed=new Set(ACTIVITY_TYPES);
   if(category==="Learning & Everyday Life"){
-    if(/alphabet|numbers|shapes|colors|opposites/.test(t)) allowed=new Set(["word-search","coloring","tracing","matching","counting","simple-math","puzzle","learning-worksheet"]);
-    if(/emotion|friendship|kindness|healthy|safety|routine/.test(t)) allowed=new Set(["word-search","coloring","educational-story","tracing","matching","puzzle","learning-worksheet"]);
+    if(/alphabet|numbers|shapes|colors|opposites/.test(t)) allowed=new Set(["word-search","coloring","tracing","matching","counting","learning-worksheet"]);
+    if(/emotion|friendship|kindness|healthy|safety|routine/.test(t)) allowed=new Set(["word-search","coloring","tracing","matching","learning-worksheet"]);
   }
-  if(/human body/.test(t)) allowed=new Set(["word-search","coloring","educational-story","matching","puzzle","learning-worksheet"]);
+  if(/human body/.test(t)) allowed=new Set(["word-search","coloring","matching","learning-worksheet"]);
   if(/volcano/.test(t)) allowed.delete("tracing");
   if(/pirates|treasure hunt|camping adventure/.test(t)) allowed.delete("tracing");
   if(/christmas|halloween/.test(t)) allowed.delete("simple-math");
@@ -222,14 +222,14 @@ function compatibleThemesForGenre(genreType){
 }
 function compatibleActivitiesForGenre(genreType){
   const g=String(genreType||"Classic Educational").toLowerCase();
-  if(g==="cinematic adventure")return ["coloring","educational-story","maze","spot-difference","puzzle"];
-  if(g==="fantasy storybook")return ["coloring","educational-story","maze","matching","spot-difference","puzzle"];
-  if(g==="documentary style")return ["word-search","coloring","educational-story","matching","puzzle","learning-worksheet"];
-  if(g==="cozy storybook")return ["coloring","educational-story","tracing","matching","counting","learning-worksheet"];
-  if(g==="science explorer")return ["word-search","coloring","educational-story","matching","counting","simple-math","puzzle","learning-worksheet"];
-  if(g==="magical world")return ["coloring","educational-story","maze","matching","counting","spot-difference","puzzle"];
-  if(g==="realistic classroom")return ["word-search","tracing","matching","counting","simple-math","puzzle","learning-worksheet"];
-  if(g==="vintage workbook")return ["word-search","tracing","matching","counting","simple-math","puzzle","learning-worksheet"];
+  if(g==="cinematic adventure")return ["coloring","maze"];
+  if(g==="fantasy storybook")return ["coloring","maze","matching"];
+  if(g==="documentary style")return ["word-search","coloring","matching","learning-worksheet"];
+  if(g==="cozy storybook")return ["coloring","tracing","matching","counting","learning-worksheet"];
+  if(g==="science explorer")return ["word-search","coloring","matching","counting","learning-worksheet"];
+  if(g==="magical world")return ["coloring","maze","matching","counting"];
+  if(g==="realistic classroom")return ["word-search","tracing","matching","counting","learning-worksheet"];
+  if(g==="vintage workbook")return ["word-search","tracing","matching","counting","learning-worksheet"];
   return ACTIVITY_TYPES;
 }
 function isGenreCompatible(activityType,theme,genreType){
@@ -253,15 +253,26 @@ function styleFromGenre(genreType){
   return map[genreType]||map["Classic Educational"];
 }
 function seedBilling() {
-  const planCount = db.prepare("SELECT COUNT(*) AS c FROM plans").get().c;
-  if (!planCount) {
-    const insert = db.prepare("INSERT INTO plans(name,monthly_prompt_limit,price_cents,active) VALUES(?,?,?,1)");
-    insert.run("Front-End", 500, 2700);
-    insert.run("Pro OTO", 2500, 4700);
-    insert.run("Publishing Kit OTO", 10000, 6700);
-    insert.run("Agency License", 50000, 9700);
+  const desiredPlans = [
+    ["Starter", 500, 2700],
+    ["Pro", 2500, 4700],
+    ["Publisher", 10000, 6700]
+  ];
+  const insertPlan = db.prepare("INSERT INTO plans(name,monthly_prompt_limit,price_cents,active) VALUES(?,?,?,1)");
+  const updatePlan = db.prepare("UPDATE plans SET monthly_prompt_limit=?,price_cents=?,active=1 WHERE name=?");
+  for (const [name,limit,price] of desiredPlans) {
+    const existing = db.prepare("SELECT id FROM plans WHERE name=?").get(name);
+    if (existing) updatePlan.run(limit,price,name);
+    else insertPlan.run(name,limit,price);
   }
-  const demoPlan = db.prepare("SELECT id FROM plans WHERE name=?").get("Front-End") || db.prepare("SELECT id FROM plans WHERE name=?").get("Creator") || db.prepare("SELECT id FROM plans ORDER BY id LIMIT 1").get();
+  db.prepare("UPDATE plans SET active=0 WHERE name NOT IN ('Starter','Pro','Publisher')").run();
+  db.prepare("UPDATE plans SET name='Starter',monthly_prompt_limit=500,price_cents=2700,active=1 WHERE name='Front-End' AND NOT EXISTS (SELECT 1 FROM plans WHERE name='Starter')").run();
+  db.prepare("UPDATE plans SET name='Pro',monthly_prompt_limit=2500,price_cents=4700,active=1 WHERE name='Pro OTO' AND NOT EXISTS (SELECT 1 FROM plans WHERE name='Pro')").run();
+  db.prepare("UPDATE plans SET name='Publisher',monthly_prompt_limit=10000,price_cents=6700,active=1 WHERE name='Publishing Kit OTO' AND NOT EXISTS (SELECT 1 FROM plans WHERE name='Publisher')").run();
+  db.prepare("UPDATE users SET plan_id=(SELECT id FROM plans WHERE name='Starter') WHERE plan_id IN (SELECT id FROM plans WHERE name IN ('Front-End'))").run();
+  db.prepare("UPDATE users SET plan_id=(SELECT id FROM plans WHERE name='Pro') WHERE plan_id IN (SELECT id FROM plans WHERE name IN ('Creator','Pro OTO','Activity Expansion OTO'))").run();
+  db.prepare("UPDATE users SET plan_id=(SELECT id FROM plans WHERE name='Publisher') WHERE plan_id IN (SELECT id FROM plans WHERE name IN ('Publishing Kit OTO','Agency License'))").run();
+  const demoPlan = db.prepare("SELECT id FROM plans WHERE name=?").get("Starter") || db.prepare("SELECT id FROM plans WHERE name=?").get("Front-End") || db.prepare("SELECT id FROM plans ORDER BY id LIMIT 1").get();
   const demo = db.prepare("SELECT id FROM users WHERE email=?").get("demo@brightbook.local");
   if (!demo && demoPlan) {
     db.prepare("INSERT INTO users(email,name,access_token,plan_id,status) VALUES(?,?,?,?,?)")
@@ -297,6 +308,12 @@ function seedBilling() {
   }
   const insertFeature = db.prepare("INSERT OR IGNORE INTO features(feature_key,name,description,category,active) VALUES(?,?,?,?,1)");
   for (const f of features) insertFeature.run(...f);
+  const supportedActivityKeys = ACTIVITY_TYPES.map(type=>`activity.${type}`);
+  db.prepare(`
+    UPDATE features
+    SET active = CASE WHEN feature_key IN (${supportedActivityKeys.map(()=>"?").join(",")}) THEN 1 ELSE 0 END
+    WHERE feature_key LIKE 'activity.%'
+  `).run(...supportedActivityKeys);
 
   const allPlans = db.prepare("SELECT id,name FROM plans").all();
   const featureRows = db.prepare("SELECT id,feature_key FROM features").all();
@@ -304,24 +321,23 @@ function seedBilling() {
   const enable = db.prepare("INSERT OR IGNORE INTO plan_features(plan_id,feature_id,enabled) VALUES(?,?,1)");
   const setPlanFeatures = db.prepare("DELETE FROM plan_features WHERE plan_id=?");
   const starter = ["activity.coloring","activity.word-search","quantity.25","export.txt","export.json"];
-  const activityExpansion = starter.concat(["activity.maze","activity.tracing","activity.learning-worksheet","quantity.30","advanced.custom-direction"]);
-  const publishingKit = activityExpansion.concat(["export.save-project","kit.listing-assets","kit.quality-check","kit.series-builder","kit.launch-checklist"]);
-  const agency = publishingKit.concat(["activity.educational-story","activity.matching","activity.counting","activity.simple-math","activity.spot-difference","activity.puzzle","advanced.learning-goal","advanced.guide-character"]);
+  const pro = starter.concat(["activity.maze","activity.tracing","activity.matching","activity.counting","quantity.30","advanced.custom-direction"]);
+  const publisher = pro.concat(["activity.learning-worksheet","export.save-project","kit.listing-assets","kit.quality-check","kit.series-builder","kit.launch-checklist"]);
   for (const plan of allPlans) {
     const starterThemes = THEME_GROUPS.slice(0,2).flatMap(([,items])=>items).map(themeFeatureKey);
     const creatorThemes = THEME_GROUPS.slice(0,4).flatMap(([,items])=>items).map(themeFeatureKey);
     const proThemes = THEME_GROUPS.flatMap(([,items])=>items).map(themeFeatureKey);
     const planName = String(plan.name).toLowerCase();
-    const isFrontEnd = planName === "starter" || planName === "front-end";
-    const isActivityExpansion = planName === "creator" || planName === "pro oto" || planName === "activity expansion oto";
-    const isPublishingKit = planName === "publishing kit oto";
-    const keys = isFrontEnd
+    const isStarter = planName === "starter" || planName === "front-end";
+    const isPro = planName === "pro" || planName === "creator" || planName === "pro oto" || planName === "activity expansion oto";
+    const isPublisher = planName === "publisher" || planName === "publishing kit oto";
+    const keys = isStarter
       ? starter.concat(starterThemes)
-      : isActivityExpansion
-        ? activityExpansion.concat(creatorThemes)
-        : isPublishingKit
-          ? publishingKit.concat(proThemes)
-          : agency.concat(proThemes);
+      : isPro
+        ? pro.concat(creatorThemes)
+        : isPublisher
+          ? publisher.concat(proThemes)
+          : [];
     setPlanFeatures.run(plan.id);
     for (const key of keys) if (byKey[key]) enable.run(plan.id, byKey[key]);
   }
@@ -1235,7 +1251,7 @@ async function adminApi(req,res,pathname) {
   if (!adminAllowed(req)) return json(res,401,{error:"Admin token is required."});
 
   if (pathname==="/api/admin/plans" && req.method==="GET") {
-    const rows = db.prepare("SELECT * FROM plans ORDER BY monthly_prompt_limit ASC").all();
+    const rows = db.prepare("SELECT * FROM plans WHERE active=1 ORDER BY monthly_prompt_limit ASC").all();
     return json(res,200,{items:rows.map(r=>({id:r.id,name:r.name,monthlyPromptLimit:r.monthly_prompt_limit,priceCents:r.price_cents,active:!!r.active,features:planFeatureKeys(r.id),createdAt:r.created_at}))});
   }
   if (pathname==="/api/admin/plans" && req.method==="POST") {
@@ -1265,7 +1281,7 @@ async function adminApi(req,res,pathname) {
   }
 
   if (pathname==="/api/admin/features" && req.method==="GET") {
-    const rows = db.prepare("SELECT * FROM features ORDER BY category,name").all();
+    const rows = db.prepare("SELECT * FROM features WHERE active=1 ORDER BY category,name").all();
     return json(res,200,{items:rows.map(r=>({id:r.id,key:r.feature_key,name:r.name,description:r.description,category:r.category,active:!!r.active,createdAt:r.created_at}))});
   }
   if (pathname==="/api/admin/features" && req.method==="POST") {

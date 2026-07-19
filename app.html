@@ -11,11 +11,27 @@
     <aside class="sidebar">
       <a class="brand" href="#"><span>BB</span><strong>BrightBook</strong></a>
       <button class="new-book" id="newBook">＋ Create New Book</button>
+      <label class="side-search" aria-label="Search BrightBook">
+        <span>Search</span>
+        <input id="sidebarSearch" placeholder="Search">
+        <kbd>K</kbd>
+      </label>
+      <small class="side-label">Main Menu</small>
       <nav>
         <button class="active" data-view="creator">✦ Book Creator</button>
         <button data-view="projects">▦ Saved Projects</button>
         <button data-view="templates">◇ Template Library</button>
       </nav>
+      <small class="side-label">Tools</small>
+      <div class="side-tools">
+        <a href="admin.html">Admin Panel</a>
+        <button id="copyAccountTokenSide" type="button">Copy Access Token</button>
+      </div>
+      <small class="side-label">Upgrades</small>
+      <div class="upgrade-list">
+        <span>Pro Activities <b>+</b></span>
+        <span>Publisher Kit <b>+</b></span>
+      </div>
       <div class="side-spacer"></div>
       <div class="account-dock" id="accountDock">
         <button class="account-button" id="accountButton" type="button">
@@ -77,14 +93,10 @@
                 <select id="activityType">
                   <option value="word-search">Word Search Book</option>
                   <option value="coloring" selected>Coloring Book</option>
-                  <option value="educational-story">Educational Storybook</option>
                   <option value="maze">Maze Book</option>
                   <option value="tracing">Tracing & Handwriting Book</option>
                   <option value="matching">Matching Activity Book</option>
                   <option value="counting">Counting Book</option>
-                  <option value="simple-math">Math Practice Book</option>
-                  <option value="spot-difference">Spot the Difference Book</option>
-                  <option value="puzzle">Children's Puzzle Book</option>
                   <option value="learning-worksheet">Educational Worksheet Pack</option>
                 </select>
                 <small class="field-help">Choose one product format</small>
