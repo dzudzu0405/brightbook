@@ -287,12 +287,6 @@ $("#genreType").addEventListener("change",applyFeatureGates);
 $("#bookIdea")?.addEventListener("input",applyFeatureGates);
 $("#accountButton")?.addEventListener("click",e=>{e.stopPropagation();$("#accountMenu")?.classList.toggle("hidden")});
 document.addEventListener("click",e=>{if(!e.target.closest?.("#accountDock"))$("#accountMenu")?.classList.add("hidden")});
-$("#copyAccountToken")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
-$("#copyAccountTokenSide")?.addEventListener("click",async()=>{if(!accountUser?.token)return;await navigator.clipboard.writeText(accountUser.token);toast("Access token copied")});
-$("#sidebarSearch")?.addEventListener("input",e=>{
-  const text=normText(e.target.value);
-  $$("nav button").forEach(button=>button.classList.toggle("hidden",text&&!normText(button.textContent).includes(text)));
-});
 $$("[data-template]").forEach(b=>b.addEventListener("click",()=>{$("#bookIdea").value=`${b.dataset.theme}: ${b.dataset.template}`;showView("creator");applyFeatureGates()}));
 async function health(){try{const d=await api("/api/health");engineReady=!!d.ollama;if(!engineReady)toast("Creator unavailable","The content engine is not ready yet.",8000)}catch{engineReady=false;toast("Connection unavailable","Please start the BrightBook service and try again.",8000)}finally{$("#generate").disabled=false}}
 function settings(){
