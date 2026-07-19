@@ -354,6 +354,11 @@ function json(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
   res.end(JSON.stringify(data));
 }
+function abortError(message="Generation was stopped.") {
+  const err = new Error(message);
+  err.name = "AbortError";
+  return err;
+}
 async function body(req) {
   const chunks=[]; let size=0;
   for await(const chunk of req){size+=chunk.length;if(size>1e6)throw new Error("The request is too large.");chunks.push(chunk)}
@@ -1011,8 +1016,11 @@ RULES
 22. Every title and concept must be different from the titles already used in earlier batches.
 23. Return only JSON matching the supplied schema.`;
 }
-async function generateBatch(input,startPage,batchCount,previousTitles,previousPages) {
+async function generateBatch(input,startPage,batchCount,previousTitles,previousPages,abortSignal) {
+  if(abortSignal?.aborted)throw abortError();
   const controller = new AbortController();
+  const abortHandler=()=>controller.abort();
+  abortSignal?.addEventListener("abort",abortHandler,{once:true});
   const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch(`${OLLAMA_URL}/api/generate`, {
@@ -1040,7 +1048,10 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
     ensurePublishingKit(book,input);
     if(book.pages.length!==batchCount)throw new Error("The content engine did not create every requested prompt. Please try again.");
     return {book,metrics:{totalDuration:result.total_duration,evalCount:result.eval_count}};
-  } finally { clearTimeout(timeout); }
+  } finally {
+    clearTimeout(timeout);
+    abortSignal?.removeEventListener("abort",abortHandler);
+  }
 }
 function fallbackPage(input,pageNumber){
   const theme=input.theme==="Custom Idea" ? (input.topic||input.bookIdea||"Custom Idea") : (input.theme||input.topic||"Activity");
@@ -1151,15 +1162,18 @@ function generateFallbackBook(input,reason=""){
   book.quality_check.score=Math.min(book.quality_check.score,82);
   return {book,metrics:{totalDuration:0,evalCount:0,batches:0,fallback:true,reason}};
 }
-async function generateBook(input) {
+async function generateBook(input,abortSignal) {
+  if(abortSignal?.aborted)throw abortError();
   if(!USE_OLLAMA_GENERATION) return generateFallbackBook(input,"Fast product kit mode is enabled.");
   try {
   const batchSize=5,pages=[],titles=[];let metadata=null,totalDuration=0,evalCount=0;
   for(let startPage=1;startPage<=input.pageCount;startPage+=batchSize){
+    if(abortSignal?.aborted)throw abortError();
     const batchCount=Math.min(batchSize,input.pageCount-startPage+1);
     let result,attempt=0;
     while(attempt<3){
-      result=await generateBatch(input,startPage,batchCount,titles,pages);
+      if(abortSignal?.aborted)throw abortError();
+      result=await generateBatch(input,startPage,batchCount,titles,pages,abortSignal);
       const known=new Set(pages.map(promptSignature));
       const signatures=result.book.pages.map(promptSignature);
       const uniqueBatch=new Set(signatures);
@@ -1183,6 +1197,7 @@ async function generateBook(input) {
   const book=removePageCountWarnings(ensurePublishingKit({...metadata,pages},input));
   return {book,metrics:{totalDuration,evalCount,batches:Math.ceil(input.pageCount/batchSize)}};
   } catch(e) {
+    if(abortSignal?.aborted)throw abortError();
     console.warn("Using fallback product kit generator:", e.message);
     return generateFallbackBook(input,e.name==="AbortError"?"The content engine took too long to respond.":e.message);
   }
@@ -1390,8 +1405,19 @@ async function api(req,res,pathname){
     let input;try{input=validate(await body(req))}catch(e){return json(res,400,{error:e.message})}
     let access;try{access=requireUserAccess(req,input)}catch(e){return json(res,403,{error:e.message})}
     if(!(await ollamaReady()))return json(res,503,{error:"The content engine is not ready. Please try again shortly."});
-    try{const result=await generateBook(input);const usage=recordUsage(access.user,access.units,{activityType:input.activityType,theme:input.theme,mode:"ai",features:requiredFeatureKeys(input)});return json(res,201,{...result,usage,features:access.features})}
-    catch(e){console.error(e);return json(res,502,{error:e.name==="AbortError"?"The content engine took too long to respond. Please try again.":e.message})}
+    const clientAbort=new AbortController();
+    res.on("close",()=>{if(!res.writableEnded)clientAbort.abort()});
+    try{
+      const result=await generateBook(input,clientAbort.signal);
+      if(clientAbort.signal.aborted)return;
+      const usage=recordUsage(access.user,access.units,{activityType:input.activityType,theme:input.theme,mode:"ai",features:requiredFeatureKeys(input)});
+      if(clientAbort.signal.aborted)return;
+      return json(res,201,{...result,usage,features:access.features});
+    }
+    catch(e){
+      if(clientAbort.signal.aborted||e.name==="AbortError")return;
+      console.error(e);return json(res,502,{error:e.message});
+    }
   }
   if(pathname==="/api/projects"&&req.method==="GET"){
     const rows=db.prepare("SELECT * FROM projects ORDER BY id DESC LIMIT 50").all();
