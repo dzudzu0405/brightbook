@@ -392,13 +392,89 @@ function renderPublishingKit(book){
   $("#seriesIdeas").innerHTML=listHtml(book.series_ideas||[]);
   $("#publishingChecklist").innerHTML=listHtml(book.publishing_checklist||[]);
 }
+function mazePageData(page){
+  const rows=(page.content_items||[]).map(item=>String(item).match(/^MAZE ROW \d+:\s*([S.G#]+)/i)?.[1]).filter(Boolean);
+  if(rows.length!==9)return null;
+  const findCell=char=>{
+    for(let row=0;row<rows.length;row++){
+      const col=rows[row].indexOf(char);
+      if(col>=0)return {row,col};
+    }
+    return null;
+  };
+  return {rows,start:findCell("S"),goal:findCell("G")};
+}
+function mazeExitSide(cell){
+  if(!cell)return "right";
+  if(cell.col===0)return "left";
+  if(cell.col===8)return "right";
+  if(cell.row===0)return "top";
+  return "bottom";
+}
+function mazeSvg(page){
+  const maze=mazePageData(page);
+  if(!maze)throw new Error("This maze page does not include a valid 9 by 9 blueprint.");
+  const w=816,h=1056,x0=120,y0=230,cell=64,stroke=8;
+  const open=(row,col)=>row>=0&&row<9&&col>=0&&col<9&&maze.rows[row][col]!=="#";
+  const entrance=mazeExitSide(maze.start),exit=mazeExitSide(maze.goal);
+  const isOpenEdge=(row,col,side)=>(maze.start?.row===row&&maze.start?.col===col&&side===entrance)||(maze.goal?.row===row&&maze.goal?.col===col&&side===exit);
+  const segments=new Set();
+  const add=(x1,y1,x2,y2)=>{
+    const a=`${x1},${y1}`,b=`${x2},${y2}`;
+    segments.add(a<b?`${a},${b}`:`${b},${a}`);
+  };
+  for(let row=0;row<9;row++){
+    for(let col=0;col<9;col++){
+      if(!open(row,col))continue;
+      const x=x0+col*cell,y=y0+row*cell;
+      if(!open(row-1,col)&&!isOpenEdge(row,col,"top"))add(x,y,x+cell,y);
+      if(!open(row,col+1)&&!isOpenEdge(row,col,"right"))add(x+cell,y,x+cell,y+cell);
+      if(!open(row+1,col)&&!isOpenEdge(row,col,"bottom"))add(x,y+cell,x+cell,y+cell);
+      if(!open(row,col-1)&&!isOpenEdge(row,col,"left"))add(x,y,x,y+cell);
+    }
+  }
+  const lineSvg=[...segments].map(segment=>{
+    const [x1,y1,x2,y2]=segment.split(",").map(Number);
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />`;
+  }).join("");
+  const s=maze.start||{row:0,col:0},g=maze.goal||{row:8,col:8};
+  const startX=x0+s.col*cell+cell/2,startY=y0+s.row*cell+cell/2;
+  const goalX=x0+g.col*cell+cell/2,goalY=y0+g.row*cell+cell/2;
+  const title=esc(page.title||"Solvable Maze");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="64" y="72" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">Name:</text>
+  <line x1="150" y1="66" x2="360" y2="66" stroke="#111827" stroke-width="3"/>
+  <text x="476" y="72" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#111827">Date:</text>
+  <line x1="548" y1="66" x2="748" y2="66" stroke="#111827" stroke-width="3"/>
+  <text x="${w/2}" y="140" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#17352d">${title}</text>
+  <text x="${w/2}" y="176" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" fill="#4b5563">${esc(page.instruction||"Find the path from START to GOAL.")}</text>
+  <g stroke="#111827" stroke-width="${stroke}" stroke-linecap="square" fill="none">${lineSvg}</g>
+  <circle cx="${startX}" cy="${startY}" r="15" fill="#22c55e"/>
+  <text x="${Math.max(56,startX-42)}" y="${Math.max(206,startY-30)}" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#15803d">START</text>
+  <circle cx="${goalX}" cy="${goalY}" r="15" fill="#ef4444"/>
+  <text x="${Math.min(w-120,goalX-28)}" y="${Math.min(h-70,goalY+52)}" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#b91c1c">GOAL</text>
+  <path d="M96 900 C170 850 230 920 320 880 C390 850 470 910 560 875 C630 848 690 870 760 835" fill="none" stroke="#bbf7d0" stroke-width="34" stroke-linecap="round"/>
+  <text x="${w/2}" y="1000" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="#94a3b8">Generated from a solvable BrightBook maze blueprint</text>
+</svg>`;
+}
 function renderPageWorkspace(book){
   selectedPageIndex=0;
-  $("#pageList").innerHTML=book.pages.map((p,n)=>`<article class="page-card" data-page-card="${n}"><header><b>${n+1}</b><div><strong>${esc(p.title)}</strong><small>${esc(typeNames[p.activity_type]||p.activity_type)} · ${esc(p.learning_goal)}</small></div><button data-copy-page="${n}" title="Copy image prompt">Copy</button></header><p>${esc(p.instruction)}</p><details><summary>View content, image prompt, and answer</summary><div class="page-details"><span>PAGE CONTENT</span><p>${p.content_items.map(esc).join(" · ")}</p><span>IMAGE PROMPT</span><p>${esc(p.image_prompt)}</p><span>ANSWER KEY</span><p class="answer">${esc(p.answer)}</p></div></details></article>`).join("");
+  $("#pageList").innerHTML=book.pages.map((p,n)=>{
+    const mazeButton=p.activity_type==="maze"?`<button data-download-maze="${n}" title="Download a guaranteed-solvable SVG maze">SVG Maze</button>`:"";
+    return `<article class="page-card" data-page-card="${n}"><header><b>${n+1}</b><div><strong>${esc(p.title)}</strong><small>${esc(typeNames[p.activity_type]||p.activity_type)} · ${esc(p.learning_goal)}</small></div><div class="page-actions">${mazeButton}<button data-copy-page="${n}" title="Copy image prompt">Copy</button></div></header><p>${esc(p.instruction)}</p><details><summary>View content, image prompt, and answer</summary><div class="page-details"><span>PAGE CONTENT</span><p>${p.content_items.map(esc).join(" · ")}</p><span>IMAGE PROMPT</span><p>${esc(p.image_prompt)}</p><span>ANSWER KEY</span><p class="answer">${esc(p.answer)}</p></div></details></article>`;
+  }).join("");
   $$("[data-copy-page]").forEach(b=>b.addEventListener("click",async()=>{
     selectedPageIndex=Number(b.dataset.copyPage);
     await navigator.clipboard.writeText(book.pages[selectedPageIndex].image_prompt);
     toast("Image prompt copied");
+  }));
+  $$("[data-download-maze]").forEach(b=>b.addEventListener("click",()=>{
+    selectedPageIndex=Number(b.dataset.downloadMaze);
+    try{
+      download(`maze-page-${selectedPageIndex+1}.svg`,mazeSvg(book.pages[selectedPageIndex]),"image/svg+xml");
+      toast("Maze SVG downloaded","This version is generated from a solvable blueprint.");
+    }catch(e){toast("Unable to create SVG maze",e.message,7000)}
   }));
 }
 function render(book){$("#loading").classList.add("hidden");$("#result").classList.remove("hidden");$("#bookTitle").textContent=book.book_title;$("#bookSubtitle").textContent=book.subtitle;$("#bookDescription").textContent=book.description;$("#metaAge").textContent=currentSettings.age;$("#metaPages").textContent=`${book.pages.length} pages`;$("#metaGenre").textContent=currentSettings.displayGenre||currentSettings.genreType||currentSettings.difficulty;$("#coverPrompt").textContent=book.cover_prompt;$("#keywords").innerHTML=tagHtml(book.keywords||[]);renderPublishingKit(book);renderPageWorkspace(book)}

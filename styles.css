@@ -342,3 +342,5 @@ select:focus,input:focus{
 details.locked{opacity:.72}
 details.locked summary small:after{content:" · locked by plan";color:#b45309}
 details.locked textarea{background:#f3f6f4;cursor:not-allowed}
+.page-card header .page-actions{flex:0;display:flex;gap:6px;align-items:flex-start}
+.page-actions button[data-download-maze]{color:#17654f;background:#eaf7f2;border-radius:7px;padding:6px 8px;font-weight:850}
