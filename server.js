@@ -137,6 +137,16 @@ const GENRE_TYPES=[
   "Realistic Classroom",
   "Vintage Workbook"
 ];
+const MAZE_LAYOUT_TYPES=[
+  "Mixed Marketplace Variety",
+  "Classic Rectangle Maze",
+  "Circular Ring Maze",
+  "Triangle Pyramid Maze",
+  "Object-Shaped Maze",
+  "House or Barn Maze",
+  "Animal Silhouette Maze",
+  "Adventure Path Maze"
+];
 function featureSlug(value=""){
   return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
@@ -438,7 +448,7 @@ const PRODUCT_RULES={
 - The image prompt must restate the complete character lock whenever the recurring character appears.`,
   "maze":`MAZE BOOK CONTRACT
 - Every maze must have one visible start, one visible goal, a theme-relevant obstacle set, and exactly one intended solution.
-- Vary maze silhouettes and scene concepts while keeping paths wide and printable.
+- Vary maze silhouettes and scene concepts while keeping paths wide and printable. Use the selected maze layout/style when provided; if it is Mixed Marketplace Variety, rotate through rectangle, circular/ring, triangle/pyramid, object-shaped, house/barn, animal silhouette, and adventure path layouts across the book.
 - content_items must include a 9 by 9 maze blueprint using S, G, dot path cells, and hash wall cells, plus an exact solution route.
 - The image prompt must ask for a clean maze based on the supplied blueprint, with one continuous open route from START to GOAL and no decorative objects inside paths.`,
   "tracing":`TRACING & HANDWRITING CONTRACT
@@ -687,7 +697,49 @@ function buildWordSearchPuzzle(theme,pageNumber){
     answers:placements.map(item=>item.answer)
   };
 }
-function buildMazePuzzle(theme,pageNumber){
+function mazeStoryPair(theme,pageNumber){
+  const t=String(theme||"").toLowerCase();
+  const farm=[
+    ["baby cow","barn"],["puppy","bone"],["bunny","carrot"],["chicken","baby chicks"],["kitten","milk bowl"],
+    ["duckling","pond"],["goat","hay stack"],["pony","stable"],["piglet","mud puddle"],["lamb","pasture gate"]
+  ];
+  const ocean=[
+    ["baby dolphin","family pod"],["sea turtle","pond-like lagoon"],["jellyfish","octopus friend"],["baby fish","aquarium"],
+    ["crab","shell home"],["seahorse","coral garden"],["penguin","iceberg"],["seal pup","safe rock"]
+  ];
+  const safari=[
+    ["baby lion","family"],["monkey","banana"],["baby hippo","friend"],["zebra","watering hole"],["giraffe","leafy tree"]
+  ];
+  const space=[
+    ["rocket","moon"],["alien spaceship","planet Earth"],["astronaut","space station"],["comet","star field"],["rover","Mars base"]
+  ];
+  const adventure=[
+    ["pirate parrot","pirate ship"],["sailor boy","ship"],["train","station"],["boat","island"],["child explorer","treasure chest"]
+  ];
+  let pairs=farm;
+  if(/ocean|sea|coral|arctic|penguin/.test(t))pairs=ocean;
+  else if(/safari|lion|zebra|giraffe|hippo/.test(t))pairs=safari;
+  else if(/space|astronaut|solar|rocket|alien/.test(t))pairs=space;
+  else if(/pirate|treasure|train|boat|airplane|car|truck|camping/.test(t))pairs=adventure;
+  const [start,goal]=pairs[(pageNumber-1)%pairs.length];
+  return {start,goal,mission:`Help the ${start} find the ${goal}`};
+}
+function mazeLayoutSpec(input,pageNumber){
+  const requested=MAZE_LAYOUT_TYPES.includes(input.mazeLayout)?input.mazeLayout:"Mixed Marketplace Variety";
+  const rotation=MAZE_LAYOUT_TYPES.filter(item=>item!=="Mixed Marketplace Variety");
+  const layout=requested==="Mixed Marketplace Variety"?rotation[(pageNumber-1)%rotation.length]:requested;
+  const shapeMap={
+    "Classic Rectangle Maze":"large rectangular maze block with straight corridors and a thick outer border",
+    "Circular Ring Maze":"round concentric ring maze with curved corridor bands and radial openings",
+    "Triangle Pyramid Maze":"triangle or pyramid-shaped maze with straight corridor segments inside the triangular outline",
+    "Object-Shaped Maze":"theme-object silhouette maze, such as an apple, carrot, shell, rocket, leaf, or gift shape",
+    "House or Barn Maze":"house or barn-shaped maze with a roof outline, simple doorway shape, and rectangular lower body",
+    "Animal Silhouette Maze":"simple animal silhouette maze with a clear child-friendly outline, such as cow, bunny, fish, bird, or dinosaur",
+    "Adventure Path Maze":"open journey-style maze path with arrows entering and exiting from different page edges"
+  };
+  return {layout,shape:shapeMap[layout]||shapeMap["Classic Rectangle Maze"]};
+}
+function buildMazePuzzle(theme,pageNumber,input={}){
   const mazeFromPath=(path)=>{
     const grid=Array.from({length:9},()=>Array(9).fill("#"));
     path.forEach(([row,col],index)=>{
@@ -709,9 +761,16 @@ function buildMazePuzzle(theme,pageNumber){
     mazeFromPath([[0,0],[0,1],[1,1],[2,1],[3,1],[3,2],[3,3],[2,3],[1,3],[1,4],[1,5],[2,5],[3,5],[4,5],[5,5],[5,4],[5,3],[6,3],[7,3],[7,4],[7,5],[7,6],[7,7],[8,7],[8,8]])
   ];
   const maze=variants[(pageNumber-1)%variants.length];
+  const story=mazeStoryPair(theme,pageNumber);
+  const layout=mazeLayoutSpec(input,pageNumber);
   return {
     rows:maze.rows,
     route:maze.route,
+    layout:layout.layout,
+    shape:layout.shape,
+    start:story.start,
+    goal:story.goal,
+    mission:story.mission,
     legend:"S = start, G = goal, . = open path, # = wall"
   };
 }
@@ -856,6 +915,7 @@ USER SETTINGS
 - Content language: ${input.language}
 - Product/activity type: ${input.activityType}
 - Type / genre direction: ${input.genreType || input.difficulty || "Classic Educational"}
+- Maze layout/style: ${input.activityType==="maze" ? input.mazeLayout : "not applicable"}
 - Page size: A4 portrait
 - Illustration style: ${input.style}
 - Learning goal: ${input.learningGoal || "age-appropriate cognitive skills, vocabulary, observation, and problem solving"}
@@ -918,12 +978,16 @@ async function generateBatch(input,startPage,batchCount,previousTitles,previousP
     if(!response.ok)throw new Error(`Ollama ${response.status}: ${(await response.text()).slice(0,300)}`);
     const result=await response.json();
     const book=JSON.parse(result.response);
-    book.pages=book.pages.slice(0,batchCount).map((page,index)=>({
-      ...page,
-      page_number:startPage+index,
-      activity_type:input.activityType,
-      image_prompt:lockImagePrompt(page.image_prompt,input)
-    }));
+    book.pages=book.pages.slice(0,batchCount).map((page,index)=>{
+      const pageNumber=startPage+index;
+      if(input.activityType==="maze")return fallbackPage(input,pageNumber);
+      return {
+        ...page,
+        page_number:pageNumber,
+        activity_type:input.activityType,
+        image_prompt:lockImagePrompt(page.image_prompt,input)
+      };
+    });
     book.cover_prompt=lockCoverPrompt(book.cover_prompt,input);
     ensurePublishingKit(book,input);
     if(book.pages.length!==batchCount)throw new Error("The content engine did not create every requested prompt. Please try again.");
@@ -1001,8 +1065,8 @@ function fallbackPage(input,pageNumber){
     return {...base,title:`${theme}: Trace Set ${pageNumber}`,instruction:`Trace the ${theme.toLowerCase()} vocabulary words, then write each word once on your own.`,learning_goal:"Letter formation, handwriting confidence, and theme vocabulary.",content_items:[`TRACE WORD 1: ${words[0]}`,`TRACE WORD 2: ${words[1]}`,`TRACE WORD 3: ${words[2]}`,`WRITING SPACE: one blank line after each word`],image_prompt:`Create a clean printable handwriting worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed decorations around the margins and leave three wide blank tracing rows plus independent writing lines for layout software. Do not render letters, dotted words, labels, captions, watermark, logo, or random text.`,answer:"Tracing is complete when each word is followed on the dotted guide and rewritten clearly on the blank line."};
   }
   if(input.activityType==="maze"){
-    const maze=buildMazePuzzle(theme,pageNumber);
-    return {...base,title:`${theme}: Maze Path ${pageNumber}`,instruction:`Help the character move through the ${theme.toLowerCase()} maze from START to GOAL.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:["MAZE SIZE: 9 by 9 cells",maze.legend,...maze.rows.map((row,index)=>`MAZE ROW ${String(index+1).padStart(2,"0")}: ${row}`),"START: S cell in the top-left area","GOAL: G cell in the bottom-right area",`SOLUTION ROUTE: ${maze.route}`],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition. Build a clean 9 by 9 maze based on this exact blueprint: ${maze.rows.join(" / ")}. Use wide white corridors for dot cells and thick simple black walls for hash cells. Put a small start icon in the S cell and a small goal icon in the G cell, but do not render the letters S or G. The maze must have a continuous open route from start to goal following this solution: ${maze.route}. Add small ${theme} themed decorations outside the maze border only. Do not place decorative objects inside paths. Do not create blocked exits, disconnected corridors, extra starts, extra goals, labels, captions, watermark, logo, or random text.`,answer:`Solution route: ${maze.route}.`};
+    const maze=buildMazePuzzle(theme,pageNumber,input);
+    return {...base,title:`${theme}: ${maze.layout} ${pageNumber}`,instruction:`${maze.mission} by moving from START to GOAL.`,learning_goal:"Planning, fine motor control, visual tracking, and problem solving.",content_items:[`MAZE LAYOUT: ${maze.layout}`,`MAZE SHAPE: ${maze.shape}`,"MAZE SIZE: 9 by 9 cells",maze.legend,...maze.rows.map((row,index)=>`MAZE ROW ${String(index+1).padStart(2,"0")}: ${row}`),`START CHARACTER: ${maze.start}`,`GOAL OBJECT: ${maze.goal}`,"START: S cell in the top-left area","GOAL: G cell in the bottom-right area",`SOLUTION ROUTE: ${maze.route}`],image_prompt:`Create a printable children's maze worksheet, vertical A4 portrait composition, inspired by bestselling kids maze activity books. Layout style: ${maze.layout}. Shape requirement: ${maze.shape}. Mission: ${maze.mission}. Build a clean 9 by 9 maze based on this exact topology blueprint: ${maze.rows.join(" / ")}. Translate the topology into the selected visual shape while keeping one continuous open route from start to goal following this solution: ${maze.route}. Use wide white corridors, thick simple black maze walls, one colorful arrow at the entrance, one colorful arrow at the exit, a small ${maze.start} icon near the start, and a small ${maze.goal} icon near the goal. Add small ${theme} themed decorations outside the maze border only. Leave blank Name and Date lines at the top, but do not render any other readable text. Do not place decorative objects inside paths. Do not create blocked exits, disconnected corridors, extra starts, extra goals, labels, captions, watermark, logo, or random text.`,answer:`Solution route: ${maze.route}.`};
   }
   return base;
 }
@@ -1093,6 +1157,9 @@ function validate(input){
   if(!input.theme)throw new Error("BrightBook could not detect a theme from your book idea.");
   if(!isCompatible(input.activityType,input.theme))throw new Error(`The detected theme is not a good fit for ${input.activityType}. Please adjust your book idea.`);
   if(!isGenreCompatible(input.activityType,input.theme,input.genreType))throw new Error(`The selected type / genre is not a good fit for ${input.activityType} with ${input.theme}. Please choose another combination.`);
+  input.mazeLayout=String(input.mazeLayout||"Mixed Marketplace Variety").trim();
+  if(input.activityType==="maze"&&!MAZE_LAYOUT_TYPES.includes(input.mazeLayout))throw new Error("Please select a valid maze layout / style.");
+  if(input.activityType!=="maze")input.mazeLayout="";
   input.difficulty=input.genreType;
   input.style=String(input.style||styleFromGenre(input.genreType)).trim();
   input.customDirection=String(input.customDirection||"").replace(/\s+/g," ").trim().slice(0,500);
@@ -1237,7 +1304,8 @@ async function api(req,res,pathname){
     return json(res,200,{
       activities:ACTIVITY_TYPES.map(type=>({type,featureKey:`activity.${type}`})),
       themes:THEME_GROUPS.flatMap(([category,items])=>items.map(name=>({name,category,featureKey:themeFeatureKey(name),compatibleActivityTypes:compatibleActivityTypes(name)}))),
-      genres:GENRE_TYPES.map(name=>({name,compatibleActivityTypes:compatibleActivitiesForGenre(name),compatibleThemes:compatibleThemesForGenre(name)}))
+      genres:GENRE_TYPES.map(name=>({name,compatibleActivityTypes:compatibleActivitiesForGenre(name),compatibleThemes:compatibleThemesForGenre(name)})),
+      mazeLayouts:MAZE_LAYOUT_TYPES
     });
   }
   if(pathname==="/api/me"&&req.method==="GET"){
