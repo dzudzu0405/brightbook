@@ -147,6 +147,12 @@ const MAZE_LAYOUT_TYPES=[
   "Animal Silhouette Maze",
   "Adventure Path Maze"
 ];
+const WORD_SEARCH_MODE_TYPES=[
+  "Standard Word Search",
+  "Easy Horizontal Only",
+  "Challenge Diagonal Mix",
+  "Advanced Longer Words"
+];
 function featureSlug(value=""){
   return String(value).toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
@@ -634,22 +640,40 @@ function wordBank(theme=""){
   const pieces=themeElements(theme);
   return [...pieces.subjects,...pieces.settings,...pieces.props,theme].map(cleanWord).filter(word=>word.length>=3);
 }
-function buildWordSearchPuzzle(theme,pageNumber){
+function buildWordSearchPuzzle(theme,pageNumber,input={}){
   const size=12;
   const pool=[...new Set(wordBank(theme))].filter(word=>word.length>=3&&word.length<=10);
   const orderedPool=Array.from({length:pool.length},(_,i)=>pool[(pageNumber+i-1)%pool.length]).sort((a,b)=>b.length-a.length);
   const grid=Array.from({length:size},()=>Array(size).fill(""));
   const placements=[];
+  const mode=WORD_SEARCH_MODE_TYPES.includes(input.wordSearchMode)?input.wordSearchMode:"Standard Word Search";
   const directions=[
     {code:"H",dr:0,dc:1},
     {code:"V",dr:1,dc:0},
     {code:"D",dr:1,dc:1}
   ];
-  const slotPlan=[
-    {code:"D",row:0,col:0},{code:"D",row:0,col:4},{code:"D",row:2,col:0},
-    {code:"V",row:0,col:11},{code:"V",row:3,col:10},{code:"V",row:5,col:8},
-    {code:"H",row:10,col:0},{code:"H",row:11,col:1},{code:"H",row:8,col:0},{code:"H",row:6,col:0}
-  ];
+  const slotPlans={
+    "Easy Horizontal Only":[
+      {code:"H",row:0,col:0},{code:"H",row:1,col:1},{code:"H",row:2,col:0},{code:"H",row:3,col:1},{code:"H",row:4,col:0},
+      {code:"H",row:6,col:0},{code:"H",row:7,col:1},{code:"H",row:8,col:0},{code:"H",row:10,col:0},{code:"H",row:11,col:1}
+    ],
+    "Challenge Diagonal Mix":[
+      {code:"D",row:0,col:0},{code:"D",row:0,col:3},{code:"D",row:1,col:0},{code:"D",row:2,col:2},
+      {code:"V",row:0,col:11},{code:"V",row:3,col:10},{code:"V",row:5,col:8},
+      {code:"H",row:10,col:0},{code:"H",row:11,col:1},{code:"H",row:8,col:0}
+    ],
+    "Advanced Longer Words":[
+      {code:"D",row:0,col:0},{code:"D",row:0,col:3},{code:"D",row:1,col:0},{code:"D",row:2,col:2},
+      {code:"V",row:0,col:11},{code:"V",row:2,col:10},{code:"V",row:4,col:8},
+      {code:"H",row:9,col:0},{code:"H",row:10,col:0},{code:"H",row:11,col:1}
+    ],
+    "Standard Word Search":[
+      {code:"D",row:0,col:0},{code:"D",row:0,col:4},{code:"D",row:2,col:0},
+      {code:"V",row:0,col:11},{code:"V",row:3,col:10},{code:"V",row:5,col:8},
+      {code:"H",row:10,col:0},{code:"H",row:11,col:1},{code:"H",row:8,col:0},{code:"H",row:6,col:0}
+    ]
+  };
+  const slotPlan=slotPlans[mode]||slotPlans["Standard Word Search"];
   const canPlace=(word,row,col,dir)=>[...word].every((letter,index)=>{
     const r=row+dir.dr*index,c=col+dir.dc*index;
     return r<size&&c<size&&(!grid[r][c]||grid[r][c]===letter);
@@ -692,6 +716,7 @@ function buildWordSearchPuzzle(theme,pageNumber){
   const alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(!grid[r][c])grid[r][c]=alphabet[(r*7+c*11+pageNumber)%alphabet.length];
   return {
+    mode,
     words:placements.map(item=>item.word),
     rows:grid.map(row=>row.join(" ")),
     answers:placements.map(item=>item.answer)
@@ -914,8 +939,9 @@ USER SETTINGS
 - Age group: ${input.age}
 - Content language: ${input.language}
 - Product/activity type: ${input.activityType}
-- Type / genre direction: ${input.genreType || input.difficulty || "Classic Educational"}
+- Type / genre direction: ${input.displayGenre || input.genreType || input.difficulty || "Classic Educational"}
 - Maze layout/style: ${input.activityType==="maze" ? input.mazeLayout : "not applicable"}
+- Word search mode: ${input.activityType==="word-search" ? input.wordSearchMode : "not applicable"}
 - Page size: A4 portrait
 - Illustration style: ${input.style}
 - Learning goal: ${input.learningGoal || "age-appropriate cognitive skills, vocabulary, observation, and problem solving"}
@@ -1011,14 +1037,16 @@ function fallbackPage(input,pageNumber){
     : `Create a clean ${input.style || "children's educational workbook illustration"} page for children, vertical A4 portrait composition. Scene: ${theme} ${activity} page ${pageNumber}; ${sceneSeed}. Include clear child-friendly subjects, balanced spacing, safe margins, readable silhouettes, and printable layout. Include theme-specific props and simple visual hierarchy. Avoid random text, fake labels, watermarks, logos, clutter, cropped important objects${avoid?`, ${avoid}`:""}.`;
   const base={page_number:pageNumber,activity_type:input.activityType,title,instruction:`Color the ${theme.toLowerCase()} scene with care and notice the farm details.`,learning_goal:"Observation, vocabulary, focus, and age-appropriate problem solving.",content_items:[sceneSeed,`${activity} task`,`${input.age} friendly layout`],image_prompt:commonPrompt,answer:"Answers may vary when the page is creative; review the finished artwork for clarity."};
   if(input.activityType==="word-search"){
-    const puzzle=buildWordSearchPuzzle(theme,pageNumber);
+    const puzzle=buildWordSearchPuzzle(theme,pageNumber,input);
     const imagePrompt=`Create a clean printable word-search worksheet frame for children, vertical A4 portrait composition. Use small ${theme} themed border decorations in the corners and margins, with a large blank central rectangle reserved for a 12 by 12 word-search grid that will be added later by layout software. Include a small blank word-list area below the grid, generous white space, simple child-friendly icons, and a polished workbook feel. Do not render any letters, words, puzzle grid, answer key, labels, captions, signage, typography, watermark, logo, or random symbols anywhere in the image.`;
     return {
       ...base,
-      title:`${theme}: Word Search ${pageNumber}`,
-      instruction:`Find the 10 hidden ${theme.toLowerCase()} words in the 12 by 12 grid. Words may go across, down, or diagonal.`,
+      title:`${theme}: ${puzzle.mode} ${pageNumber}`,
+      instruction:puzzle.mode==="Easy Horizontal Only"
+        ? `Find the 10 hidden ${theme.toLowerCase()} words in the 12 by 12 grid. Words go across only.`
+        : `Find the 10 hidden ${theme.toLowerCase()} words in the 12 by 12 grid. Words may go across, down, or diagonal.`,
       learning_goal:"Theme vocabulary, visual scanning, spelling, and focus.",
-      content_items:[`WORD LIST: ${puzzle.words.join(", ")}`,...puzzle.rows.map((row,index)=>`GRID ROW ${String(index+1).padStart(2,"0")}: ${row}`)],
+      content_items:[`WORD SEARCH MODE: ${puzzle.mode}`,`WORD LIST: ${puzzle.words.join(", ")}`,...puzzle.rows.map((row,index)=>`GRID ROW ${String(index+1).padStart(2,"0")}: ${row}`)],
       image_prompt:imagePrompt,
       answer:`ANSWER KEY: ${puzzle.answers.join("; ")}.`
     };
@@ -1144,6 +1172,19 @@ function validate(input){
   if(!input.activityType)input.activityType=Array.isArray(input.activityTypes)?input.activityTypes[0]:"";
   if(!input.activityType)throw new Error("Please select an activity type.");
   input.genreType=String(input.genreType||input.difficulty||"Classic Educational").trim();
+  input.displayGenre=String(input.displayGenre||"").trim();
+  if(input.activityType==="maze"){
+    const selectedMazeLayout=MAZE_LAYOUT_TYPES.includes(input.displayGenre)?input.displayGenre:(MAZE_LAYOUT_TYPES.includes(input.genreType)?input.genreType:input.mazeLayout);
+    input.mazeLayout=String(selectedMazeLayout||"Mixed Marketplace Variety").trim();
+    input.displayGenre=input.mazeLayout;
+    input.genreType="Classic Educational";
+  }
+  if(input.activityType==="word-search"){
+    const selectedWordSearchMode=WORD_SEARCH_MODE_TYPES.includes(input.displayGenre)?input.displayGenre:(WORD_SEARCH_MODE_TYPES.includes(input.genreType)?input.genreType:input.wordSearchMode);
+    input.wordSearchMode=String(selectedWordSearchMode||"Standard Word Search").trim();
+    input.displayGenre=input.wordSearchMode;
+    input.genreType="Classic Educational";
+  }
   if(!GENRE_TYPES.includes(input.genreType))throw new Error("Please select a valid type / genre.");
   input.bookIdea=String(input.bookIdea||"").replace(/\s+/g," ").trim().slice(0,180);
   const detectedTheme=detectThemeFromIdea(input.bookIdea,input.activityType,input.genreType);
@@ -1160,6 +1201,9 @@ function validate(input){
   input.mazeLayout=String(input.mazeLayout||"Mixed Marketplace Variety").trim();
   if(input.activityType==="maze"&&!MAZE_LAYOUT_TYPES.includes(input.mazeLayout))throw new Error("Please select a valid maze layout / style.");
   if(input.activityType!=="maze")input.mazeLayout="";
+  input.wordSearchMode=String(input.wordSearchMode||"Standard Word Search").trim();
+  if(input.activityType==="word-search"&&!WORD_SEARCH_MODE_TYPES.includes(input.wordSearchMode))throw new Error("Please select a valid word search type / genre.");
+  if(input.activityType!=="word-search")input.wordSearchMode="";
   input.difficulty=input.genreType;
   input.style=String(input.style||styleFromGenre(input.genreType)).trim();
   input.customDirection=String(input.customDirection||"").replace(/\s+/g," ").trim().slice(0,500);
@@ -1305,7 +1349,8 @@ async function api(req,res,pathname){
       activities:ACTIVITY_TYPES.map(type=>({type,featureKey:`activity.${type}`})),
       themes:THEME_GROUPS.flatMap(([category,items])=>items.map(name=>({name,category,featureKey:themeFeatureKey(name),compatibleActivityTypes:compatibleActivityTypes(name)}))),
       genres:GENRE_TYPES.map(name=>({name,compatibleActivityTypes:compatibleActivitiesForGenre(name),compatibleThemes:compatibleThemesForGenre(name)})),
-      mazeLayouts:MAZE_LAYOUT_TYPES
+      mazeLayouts:MAZE_LAYOUT_TYPES,
+      wordSearchModes:WORD_SEARCH_MODE_TYPES
     });
   }
   if(pathname==="/api/me"&&req.method==="GET"){
