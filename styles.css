@@ -229,8 +229,8 @@ select:focus,input:focus{
 .empty-preview h3,.loading h3{font-size:24px;letter-spacing:-.7px;color:#0f172a}
 .empty-preview p,.loading p{font-size:14px;color:#667085}
 .cancel-generate{
-  margin-top:18px;padding:10px 14px;border-radius:13px;border:1px solid #fecaca;
-  color:#b91c1c;background:#fff5f5;cursor:pointer;font-size:12px;font-weight:850;
+  margin-top:18px;padding:12px 18px;border-radius:14px;border:1px solid #fecaca;
+  color:#b91c1c;background:#fff5f5;cursor:pointer;font-size:14px;font-weight:900;
 }
 .cancel-generate:hover{background:#fee2e2}
 .cancel-generate:disabled{opacity:.55;cursor:not-allowed}
